@@ -1,0 +1,66 @@
+name: Build Android APK
+
+# Manual trigger: GitHub → Actions → "Build Android APK" → Run workflow
+# Auto trigger: any tag push like v1.0.1 → builds APK + creates a release
+# with the APK as a direct-download asset.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-apk:
+    name: Build debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Sync Capacitor (android)
+        run: npx cap sync android
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build APK (Gradle)
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: battleloop-live-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Create release with APK (tag builds only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          VER="${GITHUB_REF_NAME#v}"
+          gh release create "${GITHUB_REF_NAME}" "${APK}" \
+            --title "BattleLoop Live ${VER} — Android APK" \
+            --notes "Direct download: BattleLoop Live v${VER} (debug APK, install on your device). Built by GitHub Actions." \
+            --tag "${GITHUB_REF_NAME}" || \
+          gh release upload "${GITHUB_REF_NAME}" "${APK}" --clobber
+          echo "Direct download link:"
+          echo "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/app-debug.apk"
