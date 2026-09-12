@@ -34,15 +34,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          { echo "== cap version =="; npx cap version; \
-            echo "== cap copy android =="; npx cap copy android; } 2>&1 | tee /tmp/cap.log
+          echo "node: $(node -v) | npm: $(npm -v)"
+          if [ -x node_modules/.bin/cap ]; then echo "cap binary: present"; else echo "cap binary: MISSING"; fi
+          { ./node_modules/.bin/cap version; ./node_modules/.bin/cap copy android; } 2>&1 | tee /tmp/cap.log
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
-            { echo "Run: $GITHUB_RUN_ID"; echo "URL: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"; \
-              echo "Node: $(node -v)  npm: $(npm -v)"; \
-              echo "## cap output"; echo '```'; cat /tmp/cap.log; echo '```'; \
-              echo "## npm ls @capacitor"; echo '```'; npm ls @capacitor/core @capacitor/cli @capacitor/android 2>&1 || true; echo '```'; } \
-              | gh issue create --title "CI: APK build failed — run $GITHUB_RUN_ID" --body-file - || true
+            # stash the full log in a git ref so it can be fetched without log access
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config user.name "github-actions[bot]"
+            sha=$(git hash-object -w /tmp/cap.log)
+            git update-ref "refs/ci-logs/$GITHUB_RUN_ID" "$sha"
+            git push -q origin "refs/ci-logs/$GITHUB_RUN_ID:refs/ci-logs/$GITHUB_RUN_ID" || true
+            gh issue create --title "CI: APK build failed — run $GITHUB_RUN_ID" \
+              --body "Capacitor copy failed. Log stashed at ref refs/ci-logs/$GITHUB_RUN_ID" || true
             exit 1
           fi
 
