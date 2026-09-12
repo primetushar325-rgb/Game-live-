@@ -30,8 +30,21 @@ jobs:
       - name: Build web app
         run: npm run build
 
-      - name: Sync Capacitor (android)
-        run: npx cap sync android
+      - name: Copy web assets to android (with diagnostics)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo "== cap version =="; npx cap version; \
+            echo "== cap copy android =="; npx cap copy android; } 2>&1 | tee /tmp/cap.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            { echo "Run: $GITHUB_RUN_ID"; echo "URL: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"; \
+              echo "Node: $(node -v)  npm: $(npm -v)"; \
+              echo "## cap output"; echo '```'; cat /tmp/cap.log; echo '```'; \
+              echo "## npm ls @capacitor"; echo '```'; npm ls @capacitor/core @capacitor/cli @capacitor/android 2>&1 || true; echo '```'; } \
+              | gh issue create --title "CI: APK build failed — run $GITHUB_RUN_ID" --body-file - || true
+            exit 1
+          fi
 
       - name: Setup JDK 17
         uses: actions/setup-java@v4
