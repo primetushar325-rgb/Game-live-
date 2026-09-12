@@ -128,7 +128,7 @@ jobs:
             gh release create "${GITHUB_REF_NAME}" "${APK}" \
               --title "BattleLoop Live ${VER} - Android APK" \
               --notes "Direct download: BattleLoop Live v${VER} (debug APK). Built by GitHub Actions." \
-              --tag "${GITHUB_REF_NAME}" --latest
+              --latest
             rc=$?
             if [ "$rc" -ne 0 ]; then
               echo "create failed (rc=${rc}) - retrying as upload to existing release"
