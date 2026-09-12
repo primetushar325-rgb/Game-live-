@@ -58,19 +58,6 @@ jobs:
           cat "$LOG"
           exit $status
 
-      - name: Stash failure log (independent)
-        if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          LOG=/tmp/cap.log
-          if [ -f "$LOG" ]; then
-            sha=$(git hash-object -w "$LOG" 2>/dev/null) || sha=""
-            if [ -n "$sha" ]; then
-              git push -q origin "${sha}:refs/ci-logs/${GITHUB_RUN_ID}-alt" || true
-            fi
-          fi
-
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
@@ -78,8 +65,25 @@ jobs:
           java-version: '17'
 
       - name: Build APK (Gradle)
+        shell: bash
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LOG=/tmp/gradle.log
+          trap '
+            echo "=== gradle step finished (exit=$?) — stashing ===" >> "$LOG" 2>/dev/null || true
+            sha=$(git hash-object -w "$LOG" 2>/dev/null) || sha=""
+            if [ -n "$sha" ]; then
+              git push -q origin "${sha}:refs/ci-logs/${GITHUB_RUN_ID}-gradle" 2>>"$LOG" || \
+                gh issue create --title "CI: Gradle failed — run ${GITHUB_RUN_ID}" --body-file "$LOG" 2>>"$LOG" || true
+              echo "log stashed at refs/ci-logs/${GITHUB_RUN_ID}-gradle" >> "$LOG" 2>/dev/null || true
+            fi
+          ' EXIT
+          ./gradlew assembleDebug --no-daemon --stacktrace > "$LOG" 2>&1
+          status=$?
+          tail -40 "$LOG"
+          exit $status
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
