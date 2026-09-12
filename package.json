@@ -1,0 +1,26 @@
+{
+  "name": "battleloop-live",
+  "private": true,
+  "version": "1.0.0",
+  "description": "BATTLELOOP LIVE — circular elimination battle arena for YouTube Live streaming. Who will survive?",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "icons": "node scripts/make-icons.js",
+    "qa": "node qa/headless.js",
+    "cap:sync": "cap sync android"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "jsdom": "^30.0.1",
+    "playwright": "1.49",
+    "sharp": "^0.34.5",
+    "vite": "^6.4.3"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.5.2"
+  }
+}

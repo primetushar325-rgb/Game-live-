@@ -1,0 +1,40 @@
+/* Gaming battle — editable local data (user can import game logos). */
+
+const G = [
+  ['Minecraft', 'Sandbox', '#7bb661'],
+  ['Free Fire', 'Battle Royale', '#ff8a3d'],
+  ['PUBG', 'Battle Royale', '#f2b90c'],
+  ['Fortnite', 'Battle Royale', '#594dff'],
+  ['Roblox', 'Platform', '#e2e8f0'],
+  ['GTA', 'Open World', '#22d3ee'],
+  ['Valorant', 'FPS', '#ff4655'],
+  ['Counter-Strike 2', 'FPS', '#f5a623'],
+  ['Call of Duty', 'FPS', '#c0c0c0'],
+  ['League of Legends', 'MOBA', '#0ac8b9'],
+  ['Dota 2', 'MOBA', '#c23c2a'],
+  ['Apex Legends', 'Battle Royale', '#da2a2a'],
+  ['Brawl Stars', 'MOBA', '#ffcc00'],
+  ['Warzone', 'Battle Royale', '#3ddc84'],
+  ['Tekken 8', 'Fighting', '#ff6a00'],
+  ['Street Fighter 6', 'Fighting', '#e6007e'],
+  ['FIFA', 'Sports', '#3091d1'],
+  ['eFootball', 'Sports', '#00c7be'],
+  ['Clash Royale', 'Strategy', '#2a7de1'],
+  ['Genshin Impact', 'Open World', '#7ec8e3'],
+  ['Honor of Kings', 'MOBA', '#ffd200'],
+  ['Garena Free Fire MAX', 'Battle Royale', '#ff5722'],
+  ['Call of Duty Mobile', 'FPS', '#f4c20d'],
+  ['Brawlhalla', 'Fighting', '#3aa3ff'],
+];
+
+export const GAMES = G.map(([name, genre, color], i) => ({
+  id: `g_${i}_${name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+  kind: 'game',
+  name,
+  sub: genre,
+  emoji: null,
+  image: null,
+  color,
+  enabled: true,
+  index: i,
+}));

@@ -1,0 +1,12 @@
+{
+  "appId": "com.battleloop.live",
+  "appName": "BattleLoop Live",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#05060f",
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}
