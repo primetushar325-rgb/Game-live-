@@ -31,24 +31,30 @@ jobs:
         run: npm run build
 
       - name: Copy web assets to android (with diagnostics)
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "node: $(node -v) | npm: $(npm -v)"
-          if [ -x node_modules/.bin/cap ]; then echo "cap binary: present"; else echo "cap binary: MISSING"; fi
-          { ./node_modules/.bin/cap version; ./node_modules/.bin/cap copy android; } 2>&1 | tee /tmp/cap.log
-          status=${PIPESTATUS[0]}
-          if [ "$status" -ne 0 ]; then
-            # stash the full log in a git ref so it can be fetched without log access
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git config user.name "github-actions[bot]"
-            sha=$(git hash-object -w /tmp/cap.log)
-            git update-ref "refs/ci-logs/$GITHUB_RUN_ID" "$sha"
-            git push -q origin "refs/ci-logs/$GITHUB_RUN_ID:refs/ci-logs/$GITHUB_RUN_ID" || true
-            gh issue create --title "CI: APK build failed — run $GITHUB_RUN_ID" \
-              --body "Capacitor copy failed. Log stashed at ref refs/ci-logs/$GITHUB_RUN_ID" || true
-            exit 1
-          fi
+          LOG=/tmp/cap.log
+          trap '
+            echo "=== step finished (exit=$?) — pushing log ===" >> "$LOG" 2>/dev/null || true
+            sha=$(git hash-object -w "$LOG" 2>/dev/null) || sha=""
+            if [ -n "$sha" ]; then
+              git push -q origin "${sha}:refs/ci-logs/${GITHUB_RUN_ID}" 2>>"$LOG" || true
+              echo "log stashed at refs/ci-logs/${GITHUB_RUN_ID}" >> "$LOG" 2>/dev/null || true
+            fi
+          ' EXIT
+          {
+            echo "node: $(node -v 2>&1) | npm: $(npm -v 2>&1)"
+            echo "cap binary check:"; ls -la node_modules/.bin/cap 2>&1 || echo "cap binary: MISSING"
+            echo "== cap version =="
+            ./node_modules/.bin/cap version
+            echo "== cap copy android =="
+            ./node_modules/.bin/cap copy android
+          } > "$LOG" 2>&1
+          status=$?
+          cat "$LOG"
+          exit $status
 
       - name: Setup JDK 17
         uses: actions/setup-java@v4
