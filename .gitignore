@@ -15,3 +15,4 @@ android/local.properties
 # misc
 *.log
 .DS_Store
+*.zip
