@@ -51,8 +51,6 @@ jobs:
           {
             echo "node: $(node -v 2>&1) | npm: $(npm -v 2>&1)"
             echo "cap binary check:"; ls -la node_modules/.bin/cap 2>&1 || echo "cap binary: MISSING"
-            echo "== cap version =="
-            ./node_modules/.bin/cap version
             echo "== cap copy android =="
             ./node_modules/.bin/cap copy android
           } > "$LOG" 2>&1
