@@ -103,15 +103,32 @@ jobs:
 
       - name: Create release with APK (tag builds only)
         if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          APK=android/app/build/outputs/apk/debug/app-debug.apk
-          VER="${GITHUB_REF_NAME#v}"
-          gh release create "${GITHUB_REF_NAME}" "${APK}" \
-            --title "BattleLoop Live ${VER} — Android APK" \
-            --notes "Direct download: BattleLoop Live v${VER} (debug APK, install on your device). Built by GitHub Actions." \
-            --tag "${GITHUB_REF_NAME}" || \
-          gh release upload "${GITHUB_REF_NAME}" "${APK}" --clobber
-          echo "Direct download link:"
-          echo "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/app-debug.apk"
+          LOG=/tmp/release.log
+          {
+            APK=android/app/build/outputs/apk/debug/app-debug.apk
+            VER="${GITHUB_REF_NAME#v}"
+            echo "APK: $(ls -la "$APK" 2>&1)"
+            echo "gh: $(gh --version | head -1)"
+            gh auth status 2>&1 || true
+            gh release create "${GITHUB_REF_NAME}" "${APK}" \
+              --title "BattleLoop Live ${VER} - Android APK" \
+              --notes "Direct download: BattleLoop Live v${VER} (debug APK, install on your device). Built by GitHub Actions." \
+              --tag "${GITHUB_REF_NAME}" --latest \
+              || gh release upload "${GITHUB_REF_NAME}" "${APK}" --clobber
+            echo "release cmd exit: $?"
+            echo "=== release state ==="
+            gh release view "${GITHUB_REF_NAME}" --json url,assets 2>&1 || true
+          } > "$LOG" 2>&1
+          status=$?
+          cat "$LOG"
+          sha=$(git hash-object -w "$LOG" 2>/dev/null) || sha=""
+          if [ -n "$sha" ]; then git push -q origin "${sha}:refs/ci-logs/${GITHUB_RUN_ID}-release" || true; fi
+          if [ "$status" -eq 0 ]; then
+            echo "Direct download link:"
+            echo "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/app-debug.apk"
+          fi
+          exit $status
