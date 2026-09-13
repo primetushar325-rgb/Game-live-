@@ -772,3 +772,21 @@ output { color: var(--neon); font-size: 12px; font-weight: 700; min-width: 44px;
 .switem svg { color: var(--neon); flex: none; }
 .switem select { width: auto; flex: none; padding: 5px 8px; font-size: 12px; }
 .switem .tswitch { margin-left: auto; }
+
+/* Asset preparation gate: source images are cached before a match begins. */
+.asset-loading {
+  min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; color: #eaf2ff; background: radial-gradient(circle at 50% 42%, #121b4a 0, #050611 52%, #02030a 100%);
+  font-size: 14px; letter-spacing: 1.5px; text-align: center;
+}
+.asset-loading span { color: #93a9d1; font-size: 11px; letter-spacing: .5px; }
+.asset-loader { width: 42px; height: 42px; border: 3px solid rgba(56,182,255,.2); border-top-color: #38b6ff; border-radius: 50%; animation: blspin .8s linear infinite; }
+@keyframes blspin { to { transform: rotate(360deg); } }
+
+/* Visual image support in persistent match history. */
+.h-win { font-size: 13.5px; text-align: right; align-self: center; display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.h-win b { color: var(--gold); }
+.hav { width: 23px; height: 23px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(255,207,77,.65); background: #101831; }
+
+/* Stream controls remain deliberately small; triple tap can hide/reveal them. */
+.live.stream.stream-controls-hidden .controls { opacity: 0; pointer-events: none; }

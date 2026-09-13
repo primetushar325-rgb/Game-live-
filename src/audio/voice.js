@@ -26,10 +26,11 @@ function pick(pool, lastKey) {
 export function createVoice(settings, bus) {
   let lastElim = 0;
   const lastPick = {};
+  let streamVoiceDisabled = false;
 
   function speak(text, { urgent = false } = {}) {
     const s = settings.get();
-    if (!s.voiceOn || !s.voiceVolume) return;
+    if (streamVoiceDisabled || !s.voiceOn || !s.voiceVolume) return;
     if (typeof speechSynthesis === 'undefined') return;
     try {
       if (urgent) speechSynthesis.cancel();
@@ -46,6 +47,8 @@ export function createVoice(settings, bus) {
 
   const offs = [
     bus.on('match:start', (info) => {
+      streamVoiceDisabled = !!info?.streamMode && settings.get().stream?.voice === false;
+      if (streamVoiceDisabled) return;
       speak(pick(LINES.start).text);
       if (info && info.category === 'countries') {
         setTimeout(() => speak(`${info.left} flags enter the arena!`), 1400);

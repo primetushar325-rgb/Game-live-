@@ -15,6 +15,7 @@ import { COUNTRIES } from '../src/data/countries.js';
 import { avgSpeed } from '../src/engine/physics.js';
 import { Pool } from '../src/core/pool.js';
 import { SpatialGrid } from '../src/core/grid.js';
+import { normalizeContestant, makeFallbackImage } from '../src/assets/contestantAssets.js';
 
 const results = [];
 function check(name, cond, extra = '') {
@@ -30,6 +31,20 @@ check('countries: unique ISO codes', new Set(COUNTRIES.map((c) => c.code)).size 
 check('countries: unique names', new Set(COUNTRIES.map((c) => c.name)).size === COUNTRIES.length);
 check('countries: every entry has a flag glyph', COUNTRIES.every((c) => c.emoji && c.emoji.length >= 2));
 check('countries: includes Bangladesh/Brazil/USA/India', ['BD', 'BR', 'US', 'IN'].every((code) => COUNTRIES.some((c) => c.code === code)));
+
+section('CONTESTANT ASSET CONTRACT');
+{
+  const storage = createMemoryStorage();
+  const content = createContent(storage);
+  const categories = ['countries', 'youtubers', 'football', 'social', 'games', 'celebrities'];
+  const all = categories.flatMap((category) => content.list(category));
+  check('all built-in contestants expose asset fields', all.every((c) =>
+    c.id && c.name && c.shortName && c.category && c.fallbackImage && typeof c.enabled === 'boolean' && c.metadata));
+  check('country assets point to bundled PNG flags', content.list('countries').every((c) => /^flags\/[a-z]{2}\.png$/.test(c.image || '')));
+  check('every fallback is a local SVG data image', all.every((c) => c.fallbackImage.startsWith('data:image/svg+xml')));
+  const broken = normalizeContestant({ id: 'broken', name: 'Broken Image', category: 'custom', image: 'bad://asset' });
+  check('broken asset still has a visual fallback', broken.fallbackImage === makeFallbackImage(broken) && broken.fallbackImage.includes('BI'));
+}
 
 /* ---------------- 2. tournament builder ---------------- */
 section('TOURNAMENT BUILDER');
@@ -79,6 +94,28 @@ function makeEnv(over = {}) {
   const bus = new EventBus();
   const match = new Match({ settings, content, bus, assignId: () => history.nextId() });
   return { storage, settings, content, history, bus, match };
+}
+
+/* ---------------- stream setting behaviour ---------------- */
+section('STREAM MODE SETTINGS');
+{
+  const env = makeEnv({
+    ballCount: 20, countdown: 3, winnerDuration: 1, ctaDuration: 1, intermission: 1,
+    stream: {
+      autoStart: false, autoCountdown: false, cta: false, commentCta: false,
+      subscribeCta: false, voice: false, music: false, winnerAnim: false,
+      matchHistory: false, keepAwake: false, winnerHistoryCount: 5,
+    },
+  });
+  const { match } = env;
+  match.startMatch({ category: 'countries', count: 20, preset: 'SINGLE', streamMode: true, autoLive: true, id: 1, seed: 345 });
+  check('disabled stream countdown starts battle immediately', match.state === M.BATTLE);
+  match.forceWinner();
+  for (let i = 0; i < 120; i++) match.update(1 / 60);
+  check('disabled winner/CTA reaches intermission', match.state === M.INTERMISSION, match.state);
+  check('AUTO START OFF does not queue a hidden next match', match.pending === null && !match.autoNextEnabled());
+  match.nextMatch();
+  check('manual next retains stream config and no-countdown setting', match.cfg.streamMode && match.state === M.BATTLE);
 }
 
 function runMatch({

@@ -18,7 +18,10 @@ function initials(name) {
 export function getSprite(c, img, ballR) {
   const bucket = ballR < 19 ? 0 : ballR < 28 ? 1 : 2;
   const imgReady = img && img.complete && img.naturalWidth > 0 ? 1 : 0;
-  const key = `${c.id}|${imgReady}|${c.emoji || ''}|${c.color || ''}|${bucket}`;
+  // Include the source fingerprint: Content Manager may replace an image for
+  // an existing contestant id, and a stale texture must never survive that edit.
+  const imageKey = imgReady ? sourceFingerprint(img.currentSrc || img.src || '') : 'pending';
+  const key = `${c.id}|${imgReady}|${imageKey}|${c.emoji || ''}|${c.color || ''}|${bucket}`;
   const hit = cache.get(key);
   if (hit) return hit;
 
@@ -127,6 +130,12 @@ function drawFitted(g, img, cx, cy, box) {
   void sw;
   g.drawImage(img, sx, sy, (ratio >= 0.8 && ratio <= 1.25) ? ss : w, (ratio >= 0.8 && ratio <= 1.25) ? ss : h,
     cx - dw / 2, cy - dh / 2, dw, dh);
+}
+
+function sourceFingerprint(source) {
+  let h = 2166136261;
+  for (let i = 0; i < source.length; i++) h = Math.imul(h ^ source.charCodeAt(i), 16777619);
+  return (h >>> 0).toString(36);
 }
 
 function hexA(hex, a) {

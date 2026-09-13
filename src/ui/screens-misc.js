@@ -4,6 +4,7 @@ import { fmtTime } from '../audio/audioManager.js';
 import { CTA_TEMPLATES } from '../data/ctas.js';
 import { M } from '../engine/match.js';
 import { icon } from './icons.js';
+import { normalizeContestant } from '../assets/contestantAssets.js';
 
 export function renderHistory(app) {
   app.clearRoot();
@@ -21,7 +22,7 @@ export function renderHistory(app) {
             <div class="h-id">MATCH #${h.id}</div>
             <div class="h-title">${esc(h.title || h.category)}${h.rounds > 1 ? ` • ${h.rounds} ROUNDS` : ''}</div>
           </div>
-          <div class="h-win">${h.winner ? `${h.winner.emoji ? h.winner.emoji + ' ' : ''}<b>${esc(h.winner.name)}</b>` : '—'}</div>
+          <div class="h-win">${h.winner ? `${historyAvatar(h.winner)}<b>${esc(h.winner.name)}</b>` : '—'}</div>
           <div class="h-meta">${h.count} players • ${fmtTime(h.duration)} • ${new Date(h.date).toLocaleDateString()}</div>
         </div>`).join('')}
       <div class="s-reset"><button class="btn ghost danger" id="hClear">CLEAR HISTORY</button></div>
@@ -143,4 +144,11 @@ export function renderTest(app) {
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function historyAvatar(record) {
+  const c = normalizeContestant(record || {});
+  const src = c.image || c.fallbackImage;
+  return `<img class="hav" src="${esc(src)}" data-fallback="${esc(c.fallbackImage)}" alt=""
+    onerror="if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback}else{this.style.visibility='hidden'}">`;
 }

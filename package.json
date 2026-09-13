@@ -1,7 +1,7 @@
 {
   "name": "battleloop-live",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.1",
   "description": "BATTLELOOP LIVE — circular elimination battle arena for YouTube Live streaming. Who will survive?",
   "type": "module",
   "scripts": {

@@ -1,25 +1,26 @@
 # BATTLELOOP LIVE
 
 > **WHO WILL SURVIVE?** — a live elimination battle arena built for YouTube Live streaming.
-> **v2.0.0** — Stream-Mode engine edition.
+> **v2.0.1** — Stream-Mode engine edition with resilient local contestant assets.
 
 Circular physics arena with **configurable exit gaps (1–4)**. Balls (flags / logos / custom
 fighters) bounce, collide and spin — the only way to be eliminated is to **completely leave
 through a gap**. Physics decides the winner. No forced outcomes, no scripts, no online services.
 
-![status](https://img.shields.io/badge/QA-71%2F71%20headless%20%2B%20DOM%20smoke-success)
+![status](https://img.shields.io/badge/QA-79%2F79%20headless%20%2B%20DOM%20smoke-success)
 ![status](https://img.shields.io/badge/build-vite%20production-success)
 ![status](https://img.shields.io/badge/offline--first-100%25%20local-informational)
-![badge](https://img.shields.io/badge/v-2.0.0-brightgreen)
+![badge](https://img.shields.io/badge/v-2.0.1-brightgreen)
 
 ---
 
 ## What's new in 2.0
 
+- **Resilient contestant asset registry.** Every record now uses one shared `id / name / shortName / category / image / fallbackImage / enabled / metadata` contract. Local image preloading, a texture-source-aware cache, and generated offline SVG identity cards mean an unavailable primary asset never produces a blank token.
 - **Contestant images inside every ball.** All 195 country flags are bundled as real PNG
   textures (MIT `lipis/flag-icons`, rasterized to `public/flags/`). YouTuber / football /
   social / gaming / custom images render inside the token, with a safe
-  `image → emoji → initials` fallback — a blank ball is impossible.
+  `image → local identity-card → initials` fallback — a blank ball is impossible.
 - **Real physics controls.** `BALL SPEED` (10%–200% + SLOW/NORMAL/FAST/INSANE) scales velocity,
   jitter and storms; `COLLISION POWER` (LOW/NORMAL/HIGH/EXTREME) is an independent restitution.
   Adaptive sub-stepping + midpoint gap sampling prevent wall tunneling at INSANE.

@@ -18,6 +18,8 @@ import { renderContent } from './screens-content.js';
 import { renderSettings } from './screens-settings.js';
 import { renderHistory, renderTest } from './screens-misc.js';
 import { createLiveView } from './live.js';
+import { preloadContestantAssets } from '../assets/contestantAssets.js';
+import { CATEGORIES } from '../config/defaults.js';
 
 const QUALITY_ORDER = ['LOW', 'MEDIUM', 'HIGH', 'ULTRA'];
 
@@ -59,7 +61,9 @@ export function createApp(root) {
 
   /* ---------- views ---------- */
   let liveView = null;
+  let launchGeneration = 0;
   function clearRoot() {
+    launchGeneration++;
     liveView?.destroy();
     liveView = null;
     if (app._testTimer) { clearInterval(app._testTimer); app._testTimer = null; }
@@ -84,37 +88,61 @@ export function createApp(root) {
 
     startBattle(cfg) {
       clearRoot();
+      const launchId = launchGeneration;
       app._streamMode = !!cfg.streamMode;
       if (cfg.streamMode) {
         const sm = settings.get().stream || {};
         if (Number(sm.streamCountdown) >= 1) settings.set({ countdown: Number(sm.streamCountdown) });
       }
-      let view;
-      try {
-        view = createLiveView(app);
-      } catch (e) {
-        toast('Live screen failed to start: ' + e.message);
-        renderHome(app);
+
+      const launch = () => {
+        // A user may leave while assets are being prepared; stale starts must
+        // never create a second physics loop or resurrect a closed screen.
+        if (launchId !== launchGeneration) return;
+        let view;
+        try {
+          view = createLiveView(app);
+        } catch (e) {
+          toast('Live screen failed to start: ' + e.message);
+          renderHome(app);
+          return;
+        }
+        liveView = view;
+        try {
+          match.startMatch({
+            category: cfg.category,
+            count: cfg.count,
+            preset: cfg.preset,
+            battleId: cfg.battleId || null,
+            autoLive: !!(cfg.autoLive || cfg.streamMode),
+            streamMode: !!cfg.streamMode,
+            winnerCount: cfg.winnerCount || undefined,
+            id: history.nextId(),
+          });
+        } catch (e) {
+          toast(e.message, 5000);
+          clearRoot();
+          renderHome(app);
+          return;
+        }
+        app.setQuality(settings.get().quality);
+      };
+
+      const requested = cfg.category === 'quick' || cfg.category === 'random'
+        ? CATEGORIES.flatMap((category) => content.getPool(category, { battleId: cfg.battleId }))
+        : content.getPool(cfg.category, { battleId: cfg.battleId });
+      // In browsers, wait briefly for local flags/imported images before balls
+      // enter the arena. jsdom has no image loader, so smoke tests retain their
+      // synchronous navigation while production gets an actual preload gate.
+      const isJsdom = /jsdom/i.test(globalThis.navigator?.userAgent || '');
+      if (isJsdom || !requested.length) {
+        launch();
         return;
       }
-      liveView = view;
-      try {
-        match.startMatch({
-          category: cfg.category,
-          count: cfg.count,
-          preset: cfg.preset,
-          battleId: cfg.battleId || null,
-          autoLive: !!(cfg.autoLive || cfg.streamMode),
-          winnerCount: cfg.winnerCount || undefined,
-          id: history.nextId(),
-        });
-      } catch (e) {
-        toast(e.message, 5000);
-        clearRoot();
-        renderHome(app);
-        return;
-      }
-      app.setQuality(settings.get().quality);
+      root.innerHTML = `<div class="asset-loading"><div class="asset-loader"></div><b>PREPARING CONTESTANTS</b><span>Loading local images and safe fallbacks…</span></div>`;
+      preloadContestantAssets(requested, { timeout: 4500 })
+        .catch(() => [])
+        .finally(launch);
     },
 
     exitLive() {

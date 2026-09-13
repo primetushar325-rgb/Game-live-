@@ -100,6 +100,7 @@ export class Match {
       preset: cfg.preset || s.tournamentPreset,
       battleId: cfg.battleId || null,
       autoLive: !!cfg.autoLive,
+      streamMode: !!cfg.streamMode,
       id: cfg.id ?? this.assignId(),
       seed: cfg.seed ?? randomSeed(),
       titleOverride: cfg.title || null,
@@ -120,11 +121,18 @@ export class Match {
     // RANDOM_MATCH: one gap layout for the whole match (deterministic per seed)
     this.gapBase = s.gapPosition === 'RANDOM_MATCH' ? this.rng.range(0, Math.PI * 2) : null;
     this.buildRound(0);
-    this.state = M.COUNTDOWN;
     this.countdownMax = Math.max(1, s.countdown);
     this.countdownT = this.countdownMax;
     this.lastCount = -1;
+    // Stream operators can deliberately disable the between-match countdown.
+    // The simulation still starts exactly once through this one state change.
+    const useCountdown = !this.cfg.streamMode || s.stream?.autoCountdown !== false;
+    this.state = useCountdown ? M.COUNTDOWN : M.BATTLE;
     this.bus.emit('match:start', this.info());
+    if (!useCountdown) {
+      this.setMusic('NORMAL');
+      this.bus.emit('match:go', {});
+    }
   }
 
   buildRound(i) {
@@ -171,6 +179,7 @@ export class Match {
       timer: this.timer,
       seed: this.cfg?.seed ?? 0,
       autoLive: this.cfg?.autoLive ?? false,
+      streamMode: this.cfg?.streamMode ?? false,
       gapAngle: this.arena?.gapAngle ?? 0,
       gapCount: this.arena?.gapCount ?? 1,
       winnerCount: this.cfg?.winnerCount ?? 1,
@@ -185,7 +194,18 @@ export class Match {
       title: this.meta().banner,
       date: new Date().toISOString(),
       count: this.rounds[0].start,
-      winner: w ? { name: w.name, emoji: w.emoji || null, image: w.image || null, color: w.color || null, sub: w.sub || '' } : null,
+      winner: w ? {
+        id: w.id,
+        name: w.name,
+        shortName: w.shortName || null,
+        category: w.category || this.resolved,
+        emoji: w.emoji || null,
+        image: w.image || null,
+        fallbackImage: w.fallbackImage || null,
+        color: w.color || null,
+        sub: w.sub || '',
+        metadata: w.metadata || {},
+      } : null,
       rounds: this.rounds.length,
       duration: Math.round(this.elapsed),
       seed: this.cfg.seed,
@@ -237,6 +257,10 @@ export class Match {
             this.lastCount = -1;
             this.setMusic('NORMAL');
             this.bus.emit('round:start', { round: this.roundIndex + 1, start: this.left });
+          } else if (this.cfg.streamMode && this.now().stream?.winnerAnim === false) {
+            // Keep the winner result/history but allow stream operators to
+            // suppress the full celebration overlay for a faster broadcast.
+            this.beginCta();
           } else {
             this.state = M.WINNER;
             this.stateT = this.now().winnerDuration;
@@ -247,21 +271,7 @@ export class Match {
         break;
       case M.WINNER:
         this.stateT -= dt;
-        if (this.stateT <= 0) {
-          this.state = M.CTA;
-          this.stateTMax = Math.max(1, Number(this.now().ctaDuration) || 8);
-          this.stateT = this.stateTMax;
-          const sc = this.now().stream || {};
-          this.ctaSeq = ctaSequence(this.resolved || 'random', {
-            commentCta: sc.commentCta !== false,
-            subscribeCta: sc.subscribeCta !== false,
-          });
-          this.cta = this.ctaSeq[0] || this.pickCta();
-          this.ctaStep = -1;
-          this.emitCtaStep(0);
-          this.setMusic('CTA');
-          this.bus.emit('cta:start', { cta: this.cta, seq: this.ctaSeq, t: this.stateT });
-        }
+        if (this.stateT <= 0) this.beginCta();
         break;
       case M.CTA:
         this.stateT -= dt;
@@ -271,27 +281,12 @@ export class Match {
             Math.floor((1 - Math.max(0, this.stateT) / this.stateTMax) * this.ctaSeq.length));
           if (idx !== this.ctaStep) this.emitCtaStep(idx);
         }
-        if (this.stateT <= 0) {
-          this.state = M.INTERMISSION;
-          this.stateT = Math.max(1, this.now().intermission);
-          this.pending = null;
-          if (this.cfg.autoLive) {
-            // keep 'random' in the pending cfg — startMatch re-resolves a fresh
-            // category each match (anti-repetition lives in pickNextCategory)
-            this.pending = { ...this.cfg, seed: randomSeed(), id: this.assignId() };
-          }
-          const isRand = this.cfg.category === 'random' || this.cfg.category === 'quick';
-          this.bus.emit('intermission:start', {
-            nextIn: this.stateT,
-            autoLive: this.cfg.autoLive,
-            nextTitle: this.pending ? (isRand ? 'RANDOM BATTLE' : CATEGORY_META[this.cfg.category].banner) : null,
-          });
-        }
+        if (this.stateT <= 0) this.beginIntermission();
         break;
       case M.INTERMISSION:
         // Manual matches wait here on the "MATCH COMPLETE" screen (user drives
         // next); auto-live counts down and starts the next match automatically.
-        if (this.cfg.autoLive) {
+        if (this.autoNextEnabled()) {
           this.stateT -= dt;
           if (this.stateT <= 0) {
             if (this.pending) {
@@ -308,6 +303,51 @@ export class Match {
       default:
         break;
     }
+  }
+
+  /** Whether the current run is allowed to advance without interaction. */
+  autoNextEnabled() {
+    if (!this.cfg?.autoLive) return false;
+    return !this.cfg.streamMode || this.now().stream?.autoStart !== false;
+  }
+
+  /** Enter category-aware CTA, or move straight to the intermission if disabled. */
+  beginCta() {
+    if (this.cfg.streamMode && this.now().stream?.cta === false) {
+      this.beginIntermission();
+      return;
+    }
+    this.state = M.CTA;
+    this.stateTMax = Math.max(1, Number(this.now().ctaDuration) || 8);
+    this.stateT = this.stateTMax;
+    const sc = this.now().stream || {};
+    this.ctaSeq = ctaSequence(this.resolved || 'random', {
+      commentCta: sc.commentCta !== false,
+      subscribeCta: sc.subscribeCta !== false,
+    });
+    this.cta = this.ctaSeq[0] || this.pickCta();
+    this.ctaStep = -1;
+    this.emitCtaStep(0);
+    this.setMusic('CTA');
+    this.bus.emit('cta:start', { cta: this.cta, seq: this.ctaSeq, t: this.stateT });
+  }
+
+  /** One canonical intermission transition prevents duplicate timers/matches. */
+  beginIntermission() {
+    this.state = M.INTERMISSION;
+    this.stateT = Math.max(1, this.now().intermission);
+    this.pending = null;
+    if (this.autoNextEnabled()) {
+      // Keep the requested category in cfg. Only random/quick may resolve a
+      // different category in the following match; specific modes stay fixed.
+      this.pending = { ...this.cfg, seed: randomSeed(), id: this.assignId() };
+    }
+    const isRand = this.cfg.category === 'random' || this.cfg.category === 'quick';
+    this.bus.emit('intermission:start', {
+      nextIn: this.stateT,
+      autoLive: this.autoNextEnabled(),
+      nextTitle: this.pending ? (isRand ? 'RANDOM BATTLE' : CATEGORY_META[this.cfg.category].banner) : null,
+    });
   }
 
   stepBattle(dt) {
@@ -347,6 +387,7 @@ export class Match {
         sub: b.c.sub || '',
         emoji: b.c.emoji || null,
         image: b.c.image || null,
+        fallbackImage: b.c.fallbackImage || null,
         color: b.c.color || null,
         x: b.x, y: b.y,
         left: this.left,
@@ -430,7 +471,7 @@ export class Match {
           this.eliminated.push(b.c);
           this.bus.emit('eliminated', {
             name: b.c.name, sub: b.c.sub || '', emoji: b.c.emoji || null, image: b.c.image || null,
-            color: b.c.color || null, x: b.x, y: b.y, left: this.left, target: this.target,
+            fallbackImage: b.c.fallbackImage || null, color: b.c.color || null, x: b.x, y: b.y, left: this.left, target: this.target,
             round: this.roundIndex + 1, totalRounds: this.rounds.length, unit: this.meta().unit,
             id: this.cfg.id, bi: b.id, category: this.resolved, forced: true,
           });
@@ -468,9 +509,11 @@ export class Match {
   }
 
   setMusic(state) {
-    if (this.musicState === state) return;
-    this.musicState = state;
-    this.bus.emit('music:state', { state });
+    // Stream music toggle affects the real mixer, not merely the settings UI.
+    const requested = this.cfg?.streamMode && this.now().stream?.music === false ? 'OFF' : state;
+    if (this.musicState === requested) return;
+    this.musicState = requested;
+    this.bus.emit('music:state', { state: requested });
   }
 
   /* ---------------- controls ---------------- */
@@ -510,7 +553,7 @@ export class Match {
     this.eliminated.push(b.c);
     this.bus.emit('eliminated', {
       name: b.c.name, sub: b.c.sub || '', emoji: b.c.emoji || null, image: b.c.image || null,
-      color: b.c.color || null, x: b.x, y: b.y, left: this.left, target: this.target,
+      fallbackImage: b.c.fallbackImage || null, color: b.c.color || null, x: b.x, y: b.y, left: this.left, target: this.target,
       round: this.roundIndex + 1, totalRounds: this.rounds.length, unit: this.meta().unit,
       id: this.cfg.id, bi: b.id, category: this.cfg.category, forced: true,
     });

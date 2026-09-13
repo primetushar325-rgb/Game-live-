@@ -97,7 +97,7 @@ console.log('=== DOM SMOKE TEST ===');
 step('splash -> home');
 await sleep(2300);
 check('splash -> home screen', !!$('.home'), `body=${root.innerHTML.slice(0, 60)}`);
-check('home has all 12 buttons', $$('.hbtn').length === 12, `got ${$$('.hbtn').length}`);
+check('home has all 13 mode buttons', $$('.hbtn').length === 13, `got ${$$('.hbtn').length}`);
 
 /* --- start a country battle --- */
 step('start country battle');

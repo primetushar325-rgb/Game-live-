@@ -5,6 +5,7 @@
 import { CATEGORIES, CATEGORY_META } from '../config/defaults.js';
 import { PALETTE } from '../core/rng.js';
 import { icon } from './icons.js';
+import { normalizeContestant } from '../assets/contestantAssets.js';
 
 export function downscaleImage(file, max = 256) {
   return new Promise((resolve, reject) => {
@@ -67,7 +68,7 @@ export function renderContent(app) {
       <div class="c-toolbar">
         <input type="search" id="cSearch" placeholder="Search ${isCountry ? '195 countries…' : 'contestants…'}" ${isCountry ? '' : 'style="display:none"'}>
         <span class="c-count" id="cCount"></span>
-        ${isCountry ? '' : `<button class="btn small primary" id="cAdd">+ ADD</button>`}
+        ${isCountry ? '' : `<button class="btn small primary" id="cAdd">${icon('plus', 13)} ADD</button>`}
       </div>
       <div class="c-list" id="cList"></div>
       <button class="btn ghost loadmore" id="cMore" style="display:none">SHOW MORE</button>
@@ -84,10 +85,10 @@ export function renderContent(app) {
       const slice = arr.slice(0, shown);
       listEl.innerHTML = slice.map((e) => `
         <div class="crow ${e.enabled === false ? 'off' : ''}" data-id="${e.id}">
-          <span class="cthumb">${e.image ? `<img src="${e.image}">` : e.emoji ? `<i>${e.emoji}</i>` : ini(e.name)}</span>
+          <span class="cthumb">${thumbHtml(e)}</span>
           <span class="cname"><b>${esc(e.name)}</b>${e.sub ? `<small>${esc(e.sub)}</small>` : ''}</span>
           <button class="tswitch ${e.enabled === false ? '' : 'on'}" data-act="toggle" title="Enable/Disable"></button>
-          <button class="iconbtn" data-act="edit" title="Edit">✎</button>
+          <button class="iconbtn" data-act="edit" title="Edit">${icon('edit', 14)}</button>
           <button class="iconbtn" data-act="del" title="${isCountry ? 'Reset to default' : 'Delete'}">${isCountry ? icon('restart', 14) : icon('trash', 14)}</button>
         </div>`).join('') || '<div class="c-empty">No contestants found.</div>';
       moreBtn.style.display = arr.length > shown ? '' : 'none';
@@ -140,9 +141,9 @@ export function renderContent(app) {
             </div>
             <div class="m-row"><label>IMAGE</label>
               <div class="imgrow">
-                <div class="imgprev" id="ePrev">${e?.image ? `<img src="${e.image}">` : e?.emoji ? `<i>${e.emoji}</i>` : ini(e?.name || '?')}</div>
+                <div class="imgprev" id="ePrev">${thumbHtml(e || { name: '?' })}</div>
                 <div class="imgbtns">
-                  <button class="btn small" id="ePick">📁 CHOOSE IMAGE</button>
+                  <button class="btn small" id="ePick">${icon('folder', 13)} CHOOSE IMAGE</button>
                   <button class="btn small ghost" id="eClear" ${e?.image ? '' : 'disabled'}>REMOVE IMAGE</button>
                   <input type="file" id="eFile" accept="image/*" style="display:none">
                 </div>
@@ -178,7 +179,7 @@ export function renderContent(app) {
       });
       m.querySelector('#eClear').addEventListener('click', () => {
         imgData = null;
-        m.querySelector('#ePrev').innerHTML = e?.emoji ? `<i>${e.emoji}</i>` : ini(e?.name || '?');
+        m.querySelector('#ePrev').innerHTML = thumbHtml({ ...(e || {}), image: null, name: e?.name || '?' });
       });
       m.querySelector('#eSave').addEventListener('click', () => {
         const name = m.querySelector('#eName').value.trim();
@@ -208,7 +209,7 @@ export function renderContent(app) {
     body.innerHTML = `
       <div class="c-toolbar">
         <span class="c-count">${battles.length} battles</span>
-        <button class="btn small primary" id="bNew">+ NEW BATTLE</button>
+        <button class="btn small primary" id="bNew">${icon('plus', 13)} NEW BATTLE</button>
       </div>
       <div class="c-list" id="bList"></div>
       <div id="bDetail"></div>
@@ -219,7 +220,7 @@ export function renderContent(app) {
       bList.innerHTML = battles.length
         ? battles.map((b) => `
           <div class="crow battle ${battleId === b.id ? 'sel' : ''}" data-id="${b.id}">
-            <span class="cthumb">🏆</span>
+            <span class="cthumb">${icon('trophy', 18)}</span>
             <span class="cname"><b>${esc(b.name)}</b><small>${b.contestants.length} contestants</small></span>
             <button class="iconbtn" data-act="del">${icon('trash', 14)}</button>
           </div>`).join('')
@@ -241,15 +242,15 @@ export function renderContent(app) {
         <div class="c-detail">
           <div class="c-toolbar">
             <input id="dName" class="dname" value="${esc(b.name)}">
-            <button class="btn small primary" id="dAdd">+ ADD FIGHTER</button>
+            <button class="btn small primary" id="dAdd">${icon('plus', 13)} ADD FIGHTER</button>
           </div>
           <div class="c-list" id="dList">
             ${b.contestants.map((c) => `
               <div class="crow ${c.enabled === false ? 'off' : ''}" data-id="${c.id}">
-                <span class="cthumb">${c.image ? `<img src="${c.image}">` : ini(c.name)}</span>
+                <span class="cthumb">${thumbHtml(c)}</span>
                 <span class="cname"><b>${esc(c.name)}</b></span>
                 <button class="tswitch ${c.enabled === false ? '' : 'on'}" data-act="toggle"></button>
-                <button class="iconbtn" data-act="edit">✎</button>
+                <button class="iconbtn" data-act="edit">${icon('edit', 14)}</button>
                 <button class="iconbtn" data-act="del">${icon('trash', 14)}</button>
               </div>`).join('') || '<div class="c-empty">Add at least 2 fighters to start this battle.</div>'}
           </div>
@@ -292,9 +293,9 @@ export function renderContent(app) {
             <div class="m-row"><label>NAME</label><input id="fName" value="${f ? esc(f.name) : ''}"></div>
             <div class="m-row"><label>IMAGE</label>
               <div class="imgrow">
-                <div class="imgprev" id="fPrev">${f?.image ? `<img src="${f.image}">` : ini(f?.name || '?')}</div>
+                <div class="imgprev" id="fPrev">${thumbHtml(f || { name: '?' })}</div>
                 <div class="imgbtns">
-                  <button class="btn small" id="fPick">📁 CHOOSE IMAGE</button>
+                  <button class="btn small" id="fPick">${icon('folder', 13)} CHOOSE IMAGE</button>
                   <button class="btn small ghost" id="fClear" ${f?.image ? '' : 'disabled'}>REMOVE</button>
                   <input type="file" id="fFile" accept="image/*" style="display:none">
                 </div>
@@ -320,7 +321,7 @@ export function renderContent(app) {
       });
       m.querySelector('#fClear').addEventListener('click', () => {
         img = null;
-        m.querySelector('#fPrev').innerHTML = ini(f?.name || '?');
+        m.querySelector('#fPrev').innerHTML = thumbHtml({ ...(f || {}), image: null, name: f?.name || '?' });
       });
       m.querySelector('#fCancel').addEventListener('click', () => m.remove());
       m.querySelector('#fSave').addEventListener('click', () => {
@@ -349,7 +350,7 @@ export function renderContent(app) {
     body.innerHTML = `
       <div class="c-toolbar">
         <span class="c-count">${list.length} supporters (shown in LIVE HUD)</span>
-        <button class="btn small primary" id="sAdd">+ ADD</button>
+        <button class="btn small primary" id="sAdd">${icon('plus', 13)} ADD</button>
       </div>
       <div class="c-list" id="sList"></div>
     `;
@@ -360,7 +361,7 @@ export function renderContent(app) {
         <div class="crow" data-name="${esc(p.name)}">
           <span class="cthumb"><i style="color:${p.color}">#${i + 1}</i></span>
           <span class="cname"><b style="color:${p.color}">${esc(p.name)}</b><small>${Math.round(p.count).toLocaleString()} support</small></span>
-          <button class="iconbtn" data-act="edit">✎</button>
+          <button class="iconbtn" data-act="edit">${icon('edit', 14)}</button>
           <button class="iconbtn" data-act="del">${icon('trash', 14)}</button>
         </div>`).join('');
       sList.querySelectorAll('.crow').forEach((row) => {
@@ -404,4 +405,12 @@ function esc(s) {
 function ini(name) {
   const parts = String(name || '?').trim().split(/\s+/);
   return `<i>${parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : String(name || '?').slice(0, 3).toUpperCase()}</i>`;
+}
+
+/** Content-manager thumbnail with the same safe fallback as the arena token. */
+function thumbHtml(record) {
+  const c = normalizeContestant(record || {});
+  const src = c.image || c.fallbackImage;
+  return `<img src="${esc(src)}" data-fallback="${esc(c.fallbackImage)}" alt="${esc(c.name)}"
+    onerror="if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback}else{this.style.visibility='hidden'}">`;
 }

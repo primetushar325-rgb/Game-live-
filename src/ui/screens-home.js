@@ -27,6 +27,7 @@ const HOME_BTNS = [
   { id: 'custom', label: 'CUSTOM BATTLE', ic: 'userplus', cat: 'custom' },
   { id: 'random', label: 'RANDOM BATTLE', ic: 'shuffle', cat: 'random' },
   { id: 'tournament', label: 'TOURNAMENT', ic: 'trophy', cat: 'tournament' },
+  { id: 'autoLive', label: 'AUTO LIVE', ic: 'zap', cat: 'autoLive', hot: true },
   { id: 'stream', label: 'STREAM MODE', ic: 'live', cat: 'stream', hot: true },
   { id: 'content', label: 'CONTENT MANAGER', ic: 'folder' },
   { id: 'settings', label: 'SETTINGS', ic: 'gear' },
@@ -77,6 +78,9 @@ function onHomeBtn(app, id) {
     case 'tournament':
       showSetup(app, { category: 'countries', preset: 'FULL', tournament: true });
       break;
+    case 'autoLive':
+      showSetup(app, { category: 'countries', autoLive: true, preset: 'SINGLE' });
+      break;
     case 'stream':
       showSetup(app, { category: 'countries', stream: true, preset: 'SINGLE' });
       break;
@@ -100,7 +104,7 @@ export function showSetup(app, { category, preset, autoLive = false, tournament 
   const s = settings.get();
   const sm = s.stream || {};
   // stream: user picks ONE category (or random) and it loops forever in that category
-  const catChoices = stream
+  const catChoices = (stream || autoLive)
     ? [...CATEGORIES.filter((c) => c !== 'custom' || content.listBattles().length > 0), 'random']
     : category === 'random'
       ? []

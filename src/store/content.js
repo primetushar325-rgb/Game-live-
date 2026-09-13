@@ -9,6 +9,7 @@ import { SOCIAL } from '../data/social.js';
 import { FOOTBALL } from '../data/football.js';
 import { GAMES } from '../data/games.js';
 import { CELEBRITIES } from '../data/celebrities.js';
+import { normalizeContestant } from '../assets/contestantAssets.js';
 
 const KEY = 'battleloop.content.v1';
 const SUPPORTERS_KEY = 'battleloop.supporters.v1';
@@ -69,9 +70,11 @@ export function createContent(storage) {
     if (!emoji && e.country) emoji = countryEmoji(e.country);
     let image = e.image || null;
     // Countries always ship with the bundled flag set (public/flags, MIT
-    // lipis/flag-icons) unless the user replaced the image.
+    // lipis/flag-icons) unless the user replaced the image. Other categories
+    // intentionally stay local/user-provided and receive an offline identity
+    // card fallback through normalizeContestant.
     if (!image && cat === 'countries' && e.code) image = `flags/${String(e.code).toLowerCase()}.png`;
-    return { ...e, emoji, image, color: e.color || null };
+    return normalizeContestant({ ...e, image, emoji, color: e.color || null }, cat);
   }
 
   function entries(cat) {

@@ -7,6 +7,7 @@ import { phaseLabel } from '../engine/tournament.js';
 import { fmtTime, fmtNum } from '../audio/audioManager.js';
 import { tripleTap, enableWakeLock } from '../stream/streamMode.js';
 import { icon } from './icons.js';
+import { cachedContestantAsset, normalizeContestant, preloadContestantAssets } from '../assets/contestantAssets.js';
 
 export function createLiveView(app) {
   const { root, match, bus, settings, content, toast: showToast, history } = app;
@@ -69,6 +70,7 @@ export function createLiveView(app) {
   let supTimer = 0;
   let releaseWake = null;
   let untripletap = null;
+  let streamControlsHidden = false;
 
   el.classList.toggle('stream', stream);
 
@@ -76,14 +78,18 @@ export function createLiveView(app) {
   function preloadImages() {
     imageMap.clear();
     if (!match.cfg) return;
-    const pool = content.getPool(match.cfg.category, { battleId: match.cfg.battleId });
+    const pool = content.getPool(match.resolved || match.cfg.category, { battleId: match.cfg.battleId });
+    // App startup normally finishes this before match:start. This pass is also
+    // kept here for restarts and any late user-imported image; it swaps failed
+    // primaries to a local SVG fallback instead of leaving a blank token.
     for (const c of pool) {
-      if (c.image) {
-        const im = new Image();
-        im.src = c.image;
-        imageMap.set(c.id, im);
-      }
+      const ready = cachedContestantAsset(c);
+      if (ready) imageMap.set(c.id, ready);
     }
+    preloadContestantAssets(pool).then((items) => {
+      if (!el.isConnected) return;
+      for (const item of items) if (item.image) imageMap.set(item.id, item.image);
+    }).catch(() => { /* fallback sprite is always available */ });
   }
 
   /* ---------- bus wiring ---------- */
@@ -104,6 +110,7 @@ export function createLiveView(app) {
       renderWinners();
       renderSupporters();
       el.classList.toggle('auto-live', !!info.autoLive);
+      renderControls();
     }),
     bus.on('eliminated', (e) => {
       addPopup(e);
@@ -123,14 +130,17 @@ export function createLiveView(app) {
       ctaStepIdx = 0;
     }),
     bus.on('cta:step', (d) => { lastCta = d.cta; ctaStepIdx = d.index; }),
-    bus.on('intermission:start', (d) => { lastInter = d; }),
+    bus.on('intermission:start', (d) => { lastInter = d; renderControls(); }),
   ];
 
   /* ---------- avatars / qualified list ---------- */
   function avatarHtml(c, cls = 'qav') {
-    if (c?.image) return `<img class="${cls}" src="${c.image}" alt="">`;
-    if (c?.emoji) return `<span class="${cls} em">${c.emoji}</span>`;
-    return `<span class="${cls} ini">${esc(String(c?.name || '?').slice(0, 2).toUpperCase())}</span>`;
+    // All records, including history from older app versions, normalize to a
+    // local SVG fallback. Therefore an image failure never leaves a blank UI.
+    const asset = normalizeContestant(c || {});
+    const src = asset.image || asset.fallbackImage;
+    return `<img class="${cls}" src="${esc(src)}" data-fallback="${esc(asset.fallbackImage)}" alt="${esc(asset.name)}"
+      onerror="if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback}else{this.style.visibility='hidden'}">`;
   }
 
   function renderQual(list) {
@@ -150,6 +160,10 @@ export function createLiveView(app) {
   /* ---------- recent winners (persistent, newest first) ---------- */
   function renderWinners() {
     const s = settings.get();
+    if (stream && s.stream?.matchHistory === false) {
+      $('#winners').innerHTML = '';
+      return;
+    }
     const n = s.stream?.winnerHistoryCount || 5;
     const rows = (history.list() || []).slice(0, n).filter((h) => h.winner);
     const w = $('#winners');
@@ -171,7 +185,7 @@ export function createLiveView(app) {
     const d = document.createElement('div');
     d.className = 'popup';
     d.innerHTML = `<div class="pop-t">ELIMINATED</div>
-      <div class="pop-b">${avatarHtml({ image: e.image, emoji: e.emoji, name: e.name }, 'pav')}
+      <div class="pop-b">${avatarHtml({ image: e.image, fallbackImage: e.fallbackImage, name: e.name }, 'pav')}
       <span class="pop-n">${esc(e.name)}</span></div>`;
     popups.appendChild(d);
     while (popups.children.length > 4) popups.removeChild(popups.firstChild);
@@ -317,8 +331,10 @@ export function createLiveView(app) {
   function renderControls() {
     const c = $('#controls');
     if (stream) {
+      const manualNext = !match.autoNextEnabled?.() && match.state === M.INTERMISSION;
       c.innerHTML = `
         <button data-act="pause" title="Pause/Resume">${match.state === M.PAUSED ? icon('play', 18) : icon('pause', 18)}</button>
+        ${manualNext ? `<button data-act="next" title="Start next match">${icon('next', 18)}</button>` : ''}
         <button data-act="mute" title="Mute">${muted ? icon('mute', 18) : icon('volume', 18)}</button>
         <button data-act="stop" class="stop" title="Stop stream mode">${icon('stop', 18)}</button>`;
     } else {
@@ -359,10 +375,18 @@ export function createLiveView(app) {
       if (match.cfg) match.cfg.autoLive = true;
       settings.set({ autoLive: true });
       el.classList.add('auto-live');
-      releaseWake = enableWakeLock();
-      untripletap = tripleTap(el, () => toggleStream(false), { x1: 0.68, y1: 0, x2: 1, y2: 0.16 });
-      showToast('STREAM MODE — triple-tap top-right corner for controls', 3500);
+      streamControlsHidden = false;
+      el.classList.remove('stream-controls-hidden');
+      if (settings.get().stream?.keepAwake !== false) releaseWake = enableWakeLock();
+      untripletap = tripleTap(el, () => {
+        streamControlsHidden = !streamControlsHidden;
+        el.classList.toggle('stream-controls-hidden', streamControlsHidden);
+        showToast(streamControlsHidden ? 'Stream controls hidden — triple-tap to reveal' : 'Stream controls visible', 1600);
+      }, { x1: 0.68, y1: 0, x2: 1, y2: 0.16 });
+      showToast('STREAM MODE — triple-tap top-right to hide or reveal controls', 3500);
     } else {
+      streamControlsHidden = false;
+      el.classList.remove('stream-controls-hidden');
       releaseWake?.();
       releaseWake = null;
       untripletap?.();
@@ -380,7 +404,10 @@ export function createLiveView(app) {
     }
   }
 
-  renderControls();
+  // startBattle creates the view before Match.startMatch. Initialize stream
+  // affordances here so wake-lock/triple-tap are active from the first frame.
+  if (stream) toggleStream(true);
+  else renderControls();
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   /* ---------- api ---------- */

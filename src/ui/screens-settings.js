@@ -38,10 +38,14 @@ export function renderSettings(app) {
         ${row('AUTO START NEXT', toggle('smAutoStart', sm.autoStart !== false))}
         ${row('AUTO COUNTDOWN', toggle('smAutoCd', sm.autoCountdown !== false))}
         ${row('STREAM COUNTDOWN', seg('smCd', ['3', '5', '10'], String(sm.streamCountdown || 3)))}
+        ${row('CTA SEQUENCE', toggle('smCta', sm.cta !== false))}
         ${row('COMMENT CTA', toggle('smCtaCmt', sm.commentCta !== false))}
         ${row('SUBSCRIBE CTA', toggle('smCtaSub', sm.subscribeCta !== false))}
+        ${row('VOICE', toggle('smVoice', sm.voice !== false))}
+        ${row('MUSIC', toggle('smMusic', sm.music !== false))}
         ${row('WINNER ANIMATION', toggle('smWinAnim', sm.winnerAnim !== false))}
-        ${row('WINNER HISTORY VISIBLE', seg('smWinN', ['5', '10', '20'], String(sm.winnerHistoryCount || 5)))}
+        ${row('MATCH HISTORY', toggle('smHist', sm.matchHistory !== false))}
+        ${row('WINNER HISTORY SIZE', seg('smWinN', ['5', '10', '20'], String(sm.winnerHistoryCount || 5)))}
         ${row('KEEP SCREEN AWAKE', toggle('smAwake', sm.keepAwake !== false))}
         <div class="m-note">Stream mode auto-advances: match → winner → CTA → countdown → next match. Forever.</div>
       </section>
@@ -138,9 +142,13 @@ export function renderSettings(app) {
   onToggle('smAutoStart', (v) => saveStream({ autoStart: v }));
   onToggle('smAutoCd', (v) => saveStream({ autoCountdown: v }));
   onSeg('smCd', (v) => saveStream({ streamCountdown: Number(v) }));
+  onToggle('smCta', (v) => saveStream({ cta: v }));
   onToggle('smCtaCmt', (v) => saveStream({ commentCta: v }));
   onToggle('smCtaSub', (v) => saveStream({ subscribeCta: v }));
+  onToggle('smVoice', (v) => saveStream({ voice: v }));
+  onToggle('smMusic', (v) => saveStream({ music: v }));
   onToggle('smWinAnim', (v) => saveStream({ winnerAnim: v }));
+  onToggle('smHist', (v) => saveStream({ matchHistory: v }));
   onSeg('smWinN', (v) => saveStream({ winnerHistoryCount: Number(v) }));
   onToggle('smAwake', (v) => saveStream({ keepAwake: v }));
   // audio
