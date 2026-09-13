@@ -107,8 +107,8 @@ export function createLiveView(app) {
     }),
     bus.on('eliminated', (e) => {
       addPopup(e);
-      const out = $('#cstrip').querySelector('.tile:not(.out):not(.more)');
-      if (out) out.classList.add('out');
+      const t = e.bi != null ? $('#cstrip').querySelector('.tile[data-bi="' + e.bi + '"]') : null;
+      (t || $('#cstrip').querySelector('.tile:not(.out):not(.more)'))?.classList.add('out');
     }),
     bus.on('round:end', (d) => {
       lastRoundEnd = d;
@@ -185,7 +185,7 @@ export function createLiveView(app) {
     const MAXT = 70;
     const shown = balls.slice(0, MAXT);
     strip.innerHTML = shown
-      .map((b) => `<span class="tile">${avatarHtml(b.c, 'tav')}${b.c.name.length <= 9 ? `<em>${esc(b.c.name)}</em>` : ''}</span>`)
+      .map((b) => `<span class="tile" data-bi="${b.id}">${avatarHtml(b.c, 'tav')}${b.c.name.length <= 9 ? `<em>${esc(b.c.name)}</em>` : ''}</span>`)
       .join('') + (balls.length > MAXT ? `<span class="tile more">+${balls.length - MAXT}</span>` : '');
   }
 

@@ -355,6 +355,7 @@ export class Match {
         totalRounds: this.rounds.length,
         unit: this.meta().unit,
         id: this.cfg.id,
+        bi: b.id,
         category: this.resolved,
       });
     }
@@ -431,7 +432,7 @@ export class Match {
             name: b.c.name, sub: b.c.sub || '', emoji: b.c.emoji || null, image: b.c.image || null,
             color: b.c.color || null, x: b.x, y: b.y, left: this.left, target: this.target,
             round: this.roundIndex + 1, totalRounds: this.rounds.length, unit: this.meta().unit,
-            id: this.cfg.id, category: this.resolved, forced: true,
+            id: this.cfg.id, bi: b.id, category: this.resolved, forced: true,
           });
         }
       });
@@ -511,7 +512,7 @@ export class Match {
       name: b.c.name, sub: b.c.sub || '', emoji: b.c.emoji || null, image: b.c.image || null,
       color: b.c.color || null, x: b.x, y: b.y, left: this.left, target: this.target,
       round: this.roundIndex + 1, totalRounds: this.rounds.length, unit: this.meta().unit,
-      id: this.cfg.id, category: this.cfg.category, forced: true,
+      id: this.cfg.id, bi: b.id, category: this.cfg.category, forced: true,
     });
     this.pendingElims.length = 0;
     if (this.left <= this.target) this.endRound();
