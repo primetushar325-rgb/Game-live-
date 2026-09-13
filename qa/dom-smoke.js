@@ -244,15 +244,56 @@ await sleep(30); // allow the real HUD frame to enable the action button
 $('#crSuper').click();
 await sleep(30);
 check('cutter Super Cut activates from full energy', app.cutterGame.superT > 0, `super=${app.cutterGame.superT}`);
+const cutterCanvas = $('#crCanvas');
+cutterCanvas.dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true, clientX: 280 }));
+cutterCanvas.dispatchEvent(new window.MouseEvent('pointerup', { bubbles: true, clientX: 80 }));
+await sleep(30);
+check('cutter swipe changes the selected lane', app.cutterGame?.laneTarget === -1, `lane=${app.cutterGame?.laneTarget}`);
+window.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+await sleep(30);
+check('cutter keyboard lane control works', app.cutterGame?.laneTarget === 0, `lane=${app.cutterGame?.laneTarget}`);
 $('#crPause').click();
 await sleep(30);
 check('cutter pause panel works', app.cutterGame?.state === 'paused' && !!$('#crResume'));
 $('#crResume').click();
 await sleep(30);
 check('cutter resume works', app.cutterGame?.state === 'running');
+
+// Drive one real hazard through the engine to validate result persistence,
+// game-over controls and retry—not merely the presentation markup.
+const cutterProfileBeforeGameOver = app.cutterSave.get();
+const forcedCutter = app.cutterGame;
+forcedCutter.score = Math.max(123, forcedCutter.score);
+forcedCutter.coins = Math.max(12, forcedCutter.coins);
+forcedCutter.cuts = Math.max(1, forcedCutter.cuts);
+forcedCutter.health = 1;
+forcedCutter.superT = 0; // the hazard must be tested after the active Super window
+forcedCutter.objects.push({ id: 'dom_hazard', kind: 'obstacle', lane: forcedCutter.laneTarget, z: .03, speedFactor: 1, spin: 0, name: 'DOM Barrier', material: 'hazard', shape: 'barrier', color: '#f55', durability: 99, size: 1 });
+await sleep(100);
+const cutterProfileAfterGameOver = app.cutterSave.get();
+check('cutter game-over result and retry controls render', app.cutterGame?.state === 'gameover' && !!$('#crRetry') && !!$('#crExit'));
+check('cutter game-over safely persists a completed run', cutterProfileAfterGameOver.runs === cutterProfileBeforeGameOver.runs + 1 && cutterProfileAfterGameOver.coins >= cutterProfileBeforeGameOver.coins + 12);
+$('#crRetry').click();
+await sleep(100);
+check('cutter retry starts a fresh run', app.cutterGame?.state === 'countdown' && !!$('#crCanvas'));
 app.exitCutter();
 await sleep(30);
 check('cutter exit returns to its own menu', !!$('.cutter-menu'));
+
+// Seed only the isolated Cutter profile, then prove the rendered store spends
+// coins and updates a persistent upgrade level.
+app.cutterSave.addRun({ coins: 500 });
+const cutterUpgradeBefore = app.cutterSave.get();
+$('#crUpgrade').click();
+await sleep(30);
+check('cutter upgrade screen opens from the menu', !!$('.cutter-upgrades') && !!$('[data-upgrade="power"]'));
+$('[data-upgrade="power"]').click();
+await sleep(30);
+const cutterUpgradeAfter = app.cutterSave.get();
+check('cutter upgrade button spends coins and persists level', cutterUpgradeAfter.upgrades.power === cutterUpgradeBefore.upgrades.power + 1 && cutterUpgradeAfter.coins < cutterUpgradeBefore.coins);
+$('#cuBack').click();
+await sleep(30);
+check('cutter upgrade back navigation returns to mode menu', !!$('.cutter-menu'));
 app.navigate('home');
 await sleep(30);
 check('cutter menu returns safely to original home', !!$('.home'));
