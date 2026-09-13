@@ -19,7 +19,7 @@ import { renderSettings } from './screens-settings.js';
 import { renderHistory, renderTest } from './screens-misc.js';
 import { createLiveView } from './live.js';
 
-const QUALITY_ORDER = ['LOW', 'MEDIUM', 'HIGH'];
+const QUALITY_ORDER = ['LOW', 'MEDIUM', 'HIGH', 'ULTRA'];
 
 export function createApp(root) {
   const storage = createLocalStorage();
@@ -84,6 +84,11 @@ export function createApp(root) {
 
     startBattle(cfg) {
       clearRoot();
+      app._streamMode = !!cfg.streamMode;
+      if (cfg.streamMode) {
+        const sm = settings.get().stream || {};
+        if (Number(sm.streamCountdown) >= 1) settings.set({ countdown: Number(sm.streamCountdown) });
+      }
       let view;
       try {
         view = createLiveView(app);
@@ -99,7 +104,8 @@ export function createApp(root) {
           count: cfg.count,
           preset: cfg.preset,
           battleId: cfg.battleId || null,
-          autoLive: !!cfg.autoLive,
+          autoLive: !!(cfg.autoLive || cfg.streamMode),
+          winnerCount: cfg.winnerCount || undefined,
           id: history.nextId(),
         });
       } catch (e) {

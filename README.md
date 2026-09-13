@@ -1,14 +1,43 @@
 # BATTLELOOP LIVE
 
 > **WHO WILL SURVIVE?** — a live elimination battle arena built for YouTube Live streaming.
+> **v2.0.0** — Stream-Mode engine edition.
 
-Circular physics arena with **one exit gap**. Balls (flags / logos / custom fighters) bounce,
-collide and spin — the only way to be eliminated is to **completely leave through the gap**.
-Physics decides the winner. No forced outcomes, no scripts, no online services.
+Circular physics arena with **configurable exit gaps (1–4)**. Balls (flags / logos / custom
+fighters) bounce, collide and spin — the only way to be eliminated is to **completely leave
+through a gap**. Physics decides the winner. No forced outcomes, no scripts, no online services.
 
-![status](https://img.shields.io/badge/QA-61%2F61%20headless%20%2B%20DOM%20smoke-success)
+![status](https://img.shields.io/badge/QA-71%2F71%20headless%20%2B%20DOM%20smoke-success)
 ![status](https://img.shields.io/badge/build-vite%20production-success)
 ![status](https://img.shields.io/badge/offline--first-100%25%20local-informational)
+![badge](https://img.shields.io/badge/v-2.0.0-brightgreen)
+
+---
+
+## What's new in 2.0
+
+- **Contestant images inside every ball.** All 195 country flags are bundled as real PNG
+  textures (MIT `lipis/flag-icons`, rasterized to `public/flags/`). YouTuber / football /
+  social / gaming / custom images render inside the token, with a safe
+  `image → emoji → initials` fallback — a blank ball is impossible.
+- **Real physics controls.** `BALL SPEED` (10%–200% + SLOW/NORMAL/FAST/INSANE) scales velocity,
+  jitter and storms; `COLLISION POWER` (LOW/NORMAL/HIGH/EXTREME) is an independent restitution.
+  Adaptive sub-stepping + midpoint gap sampling prevent wall tunneling at INSANE.
+- **1–4 exit gaps** (evenly distributed), with `FIXED / RANDOM MATCH / RANDOM ROUND` placement
+  and an optional moving-gap special mode. Larger arena (dominant on screen, no HUD overlap).
+- **Stream Mode engine.** Pick one category → `START STREAM` → it runs
+  match → winner → CTA → auto countdown → next match **forever in that category**, with minimal
+  controls (pause / mute / stop), triple-tap reveal, wake lock and auto-advance. No "home/next"
+  popups, no manual interaction. Stop it any time.
+- **Winner presentation + history.** Zoom/glow/confetti/fanfare winner overlay (multi-winner
+  podium for 5/10-winner finals) plus a persistent **RECENT WINNERS** panel.
+- **Dynamic CTA system.** Category-aware comment CTAs + a sequential
+  comment → subscribe → like/follow sequence with a premium vector-icon system (no UI emoji).
+- **Expanded audio.** 14 generative music variants (NORMAL×4, SUSPENSE×3, FINAL×3,
+  VICTORY×3, CTA×2) with dip transitions; dynamic music follows the survivor count; more
+  announcer variations; master/music/SFX/voice volumes.
+- **Tournament winner count** (1/5/10), ULTRA quality tier, and a bigger
+  headless QA matrix (gaps × speed × collision, 195-ball INSANE stress, 100-match stream loop).
 
 ---
 
@@ -82,7 +111,7 @@ to hide/show the control layer (see *Stream mode* below).
 Two suites, both green:
 
 ```bash
-npm run qa          # 61/61 headless engine checks
+npm run qa          # 71/71 headless engine checks (gaps x speed matrix, 195-ball stress, 100-match stream loop)
 node qa/dom-smoke.js   # boots the real app in jsdom, clicks every screen,
                        # runs a full match lifecycle (countdown → 195-ball battle
                        # → pause/resume → winner → CTA → intermission → history)

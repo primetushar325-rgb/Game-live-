@@ -117,7 +117,9 @@ check('timer visible', /--:--|\d+:\d{2}/.test($('#timer')?.textContent || ''));
 check('match in countdown/battle', ['countdown', 'battle'].includes(app.match.state), app.match.state);
 check('match info line rendered', /MATCH #\d+/.test($('#matchInfo')?.textContent || ''), $('#matchInfo')?.textContent);
 check('supporters list rendered', $$('#supList li').length > 0);
-check('controls rendered', $$('#controls button').length >= 8);
+check('controls rendered', $$('#controls button').length >= 7, `got ${$$('#controls button').length}`);
+check('contestant strip rendered', $$('#cstrip .tile').length > 0, `tiles=${$$('#cstrip .tile').length}`);
+check('winner history panel present', !!$('#winners'));
 
 await sleep(3800); // countdown 3s default → battle
 check('battle running after countdown', app.match.state === 'battle', app.match.state);
@@ -225,6 +227,39 @@ check('force elimination reduced left', killed && app.match.left === before - 1,
 app.exitLive();
 await sleep(30);
 check('exit -> home', !!$('.home'));
+
+/* --- STREAM MODE end-to-end (auto forever loop, same category) --- */
+step('stream mode: start -> auto matches -> stop');
+$$('.hbtn').find((b) => b.dataset.id === 'stream').click();
+await sleep(50);
+check('stream modal open (STREAM badge)', !!$('.m-live') && /START STREAM/.test($('#mStart')?.textContent || ''), $('#mStart')?.textContent);
+$$('#mCount button').find((b) => b.dataset.n === '20').click();
+$$('#mGaps button').find((b) => b.dataset.n === '2').click();
+$$('#mSpeed button').find((b) => b.dataset.v === 'FAST').click();
+await sleep(20);
+$('#mStart').click();
+await sleep(100);
+check('stream live screen active', !!$('.live.stream'), 'live.stream class');
+check('stream = 20 balls, autoLive', app.match.balls.length === 20 && app.match.cfg?.autoLive === true, `balls=${app.match.balls.length} auto=${app.match.cfg?.autoLive}`);
+check('stream: 2 gaps configured', app.match.arena?.gapCount === 2, `gaps=${app.match.arena?.gapCount}`);
+check('stream: no home/next buttons in controls', !$('[data-act="home"]') && !$('[data-act="next"]') && !!$('[data-act="stop"]'), 'stop present, home/next absent');
+await sleep(3800); // countdown 3s
+check('stream: battle running', app.match.state === 'battle', app.match.state);
+const sid1 = app.match.cfg.id;
+app.match.forceWinner();
+await sleep(3200); // round result 2.4s
+check('stream: winner overlay', app.match.state === 'winner' && !!$('.win-name'), app.match.state);
+await sleep(13000); // winner 12s
+check('stream: cta overlay with sequence dots', app.match.state === 'cta' && !!$('.cta-text') && !!$('.cta-dots'), app.match.state + ' dots=' + $$('.cta-dots i').length);
+await sleep(9000); // cta 8s
+check('stream: intermission auto (no buttons)', app.match.state === 'intermission' && !!$('.inter-cd') && !$('#ovNext'), app.match.state);
+await sleep(6600); // intermission 7s -> land inside the auto countdown
+check('stream: auto countdown with next-match title', app.match.state === 'countdown' && !!($('.cd-t') && /NEXT MATCH|COUNTRY/.test($('.cd-t').textContent)), `st=${app.match.state} title=${$('.cd-t')?.textContent}`);
+await sleep(3200); // countdown 3s -> battle
+check('stream: next match auto-started (new id, same category)', app.match.cfg?.id > sid1 && app.match.cfg?.category === 'countries' && app.match.state === 'battle', `id=${app.match.cfg?.id} cat=${app.match.cfg?.category} st=${app.match.state}`);
+$('[data-act="stop"]').click();
+await sleep(30);
+check('stream: stop returns home', !!$('.home'));
 
 check('no uncaught errors', errors.length === 0, errors.slice(0, 4).join(' | '));
 

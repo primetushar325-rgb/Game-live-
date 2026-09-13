@@ -113,7 +113,26 @@ export function createRenderer({ canvas, settings, matchRef, imageMap, bus }) {
     particles.setQuality(key);
   }
 
-  function drawChevron(g, cx, cy, R, gapAngle, t, phase) {
+  /** The closed (solid) arc segments between the gaps. */
+function closedSegments(arena) {
+  const gaps = [...arena.gaps].sort((a, b) => a.angle - b.angle);
+  if (gaps.length <= 1) {
+    const gp = gaps[0] || { angle: 0, halfRad: 0.1 };
+    return [[gp.angle + gp.halfRad, gp.angle - gp.halfRad + TAU]];
+  }
+  const segs = [];
+  for (let i = 0; i < gaps.length; i++) {
+    const a = gaps[i];
+    const b = gaps[(i + 1) % gaps.length];
+    let start = a.angle + a.halfRad;
+    let end = b.angle - b.halfRad;
+    if (end <= start) end += TAU; // wraps around 2π
+    segs.push([start, end]);
+  }
+  return segs;
+}
+
+function drawChevron(g, cx, cy, R, gapAngle, t, phase) {
     g.save();
     g.translate(cx, cy);
     g.rotate(gapAngle);
@@ -148,39 +167,41 @@ export function createRenderer({ canvas, settings, matchRef, imageMap, bus }) {
 
     const gl = QUALITY[quality].glowPasses;
 
-    // exit wedge (danger zone beyond the gap)
+    // exit wedges (danger zone beyond each gap)
     g.save();
-    g.beginPath();
-    g.moveTo(arena.cx, arena.cy);
-    g.arc(arena.cx, arena.cy, R + 90, arena.gapAngle - arena.gapHalfRad, arena.gapAngle + arena.gapHalfRad);
-    g.closePath();
     const wg = g.createRadialGradient(arena.cx, arena.cy, R * 0.85, arena.cx, arena.cy, R + 90);
     wg.addColorStop(0, 'rgba(255,61,113,0.0)');
     wg.addColorStop(0.55, 'rgba(255,61,113,0.10)');
     wg.addColorStop(1, 'rgba(255,61,113,0.22)');
     g.fillStyle = wg;
-    g.fill();
+    for (const gp of arena.gaps) {
+      g.beginPath();
+      g.moveTo(arena.cx, arena.cy);
+      g.arc(arena.cx, arena.cy, R + 90, gp.angle - gp.halfRad, gp.angle + gp.halfRad);
+      g.closePath();
+      g.fill();
+    }
     g.restore();
 
-    // boundary ring with gap (layered strokes = cheap glow)
-    const a0 = arena.gapAngle + arena.gapHalfRad;
-    const a1 = arena.gapAngle - arena.gapHalfRad + TAU;
+    // boundary ring: solid everywhere EXCEPT the gaps (layered strokes = glow)
+    const segs = closedSegments(arena);
     const passes = [
       { w: R * 0.055, style: 'rgba(56,182,255,0.10)' },
       { w: R * 0.022, style: 'rgba(56,182,255,0.35)' },
       { w: 3.5, style: 'rgba(190,235,255,0.95)' },
     ].slice(0, gl);
     for (const p of passes) {
-      g.beginPath();
-      g.arc(arena.cx, arena.cy, R, a0, a1);
       g.strokeStyle = p.style;
       g.lineWidth = p.w;
       g.lineCap = 'round';
-      g.stroke();
+      for (const [a0, a1] of segs) {
+        g.beginPath();
+        g.arc(arena.cx, arena.cy, R, a0, a1);
+        g.stroke();
+      }
     }
-    // glowing edge caps
-    const [e1, e2] = arena.gapEdgePoints();
-    for (const e of [e1, e2]) {
+    // glowing edge caps (all gaps)
+    for (const e of arena.gapEdgePoints()) {
       const cg = g.createRadialGradient(e.x, e.y, 1, e.x, e.y, 26);
       cg.addColorStop(0, 'rgba(200,240,255,0.95)');
       cg.addColorStop(0.4, 'rgba(56,182,255,0.5)');
@@ -190,8 +211,8 @@ export function createRenderer({ canvas, settings, matchRef, imageMap, bus }) {
       g.arc(e.x, e.y, 26, 0, TAU);
       g.fill();
     }
-    // exit chevrons
-    if (quality !== 'LOW') drawChevron(g, arena.cx, arena.cy, R, arena.gapAngle, t, 0);
+    // exit chevrons (one stream per gap)
+    if (quality !== 'LOW') arena.gaps.forEach((gp, i) => drawChevron(g, arena.cx, arena.cy, R, gp.angle, t, i * 0.33));
 
     // storm wave
     for (let i = stormRings.length - 1; i >= 0; i--) {

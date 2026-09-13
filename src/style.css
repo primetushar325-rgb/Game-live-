@@ -638,3 +638,137 @@ output { color: var(--neon); font-size: 12px; font-weight: 700; min-width: 44px;
 }
 .tbtn:active { transform: scale(0.95); }
 .tbtn.hot { border-color: rgba(255, 61, 113, 0.6); color: #ff8aa8; grid-column: 1 / -1; }
+
+/* ============================================================
+   V2 — qualified avatars / winners / contestant strip / stream
+   ============================================================ */
+
+/* qualified-for-final avatar chips (horizontal scroll) */
+.qual-scroll {
+  display: flex; gap: 4px;
+  max-height: 66px; overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none; padding-bottom: 2px;
+}
+.qual-scroll::-webkit-scrollbar { display: none; }
+.qchip {
+  flex: none;
+  display: flex; align-items: center; gap: 4px;
+  background: rgba(20, 28, 66, 0.9);
+  border: 1px solid var(--panel-line);
+  border-radius: 16px;
+  padding: 2px 7px 2px 2px;
+  animation: fadeUp 0.4s both;
+}
+.qchip i { font-style: normal; font-size: 10px; font-weight: 800; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qempty { color: var(--dim); font-size: 10.5px; font-weight: 600; padding: 4px 2px; }
+.qav, .wav, .tav, .pav, .rri, .pi, .tki { border-radius: 50%; object-fit: cover; display: block; }
+.qav { width: 20px; height: 20px; background: #0a0e24; }
+.qav.em, .qav.ini, .wav.em, .wav.ini, .tav.em, .tav.ini, .pav.em, .pav.ini, .rri.em, .rri.ini, .pi.em, .pi.ini, .tki.em, .tki.ini {
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 35% 30%, #232a4d, #0a0d20);
+  font-weight: 900; color: #dfe8ff;
+}
+.qav.em { font-size: 12px; } .qav.ini { font-size: 7.5px; }
+.wav { width: 16px; height: 16px; } .wav.em { font-size: 10px; } .wav.ini { font-size: 6.5px; }
+.tav { width: 26px; height: 26px; } .tav.em { font-size: 15px; } .tav.ini { font-size: 8px; }
+.pav { width: 26px; height: 26px; } .pav.em { font-size: 15px; } .pav.ini { font-size: 9px; }
+.rri { width: 18px; height: 18px; } .rri.em { font-size: 11px; } .rri.ini { font-size: 7px; }
+.pi { width: 24px; height: 24px; } .pi.em { font-size: 13px; } .pi.ini { font-size: 8px; }
+.tki { width: 100%; height: 100%; } .tki.em { font-size: 90px; } .tki.ini { font-size: 56px; }
+
+/* recent winners — right edge under top HUD */
+.winners {
+  position: absolute; top: 21.5%; right: 10px;
+  display: flex; flex-direction: column; gap: 5px;
+  max-width: 210px;
+  pointer-events: none;
+}
+.wrow {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(24, 18, 6, 0.82);
+  border: 1px solid rgba(255, 207, 77, 0.4);
+  border-radius: 14px;
+  padding: 3px 9px 3px 4px;
+  font-size: 11px;
+  animation: fadeUp 0.5s both;
+}
+.wrow svg { color: var(--gold); flex: none; }
+.wrow b { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+
+/* bottom contestant strip (compact image tiles + status) */
+.cstrip {
+  position: absolute; left: 0; right: 0;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
+  display: flex; gap: 5px;
+  padding: 5px 10px;
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none;
+  background: linear-gradient(180deg, transparent, rgba(3, 4, 14, 0.88) 30%);
+  pointer-events: none;
+}
+.cstrip::-webkit-scrollbar { display: none; }
+.tile {
+  flex: none;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  width: 34px;
+  transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
+}
+.tile em {
+  font-style: normal; font-size: 7.5px; font-weight: 700; color: var(--dim);
+  max-width: 34px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tile.out { opacity: 0.28; filter: grayscale(0.9); transform: scale(0.92); }
+.tile.qual .tav { box-shadow: 0 0 0 2px var(--gold), 0 0 12px rgba(255, 207, 77, 0.6); }
+.tile.win { transform: scale(1.12); }
+.tile.win .tav { box-shadow: 0 0 0 2.5px #fff, 0 0 18px rgba(255, 207, 77, 0.9); }
+.tile.more {
+  align-items: center; justify-content: center;
+  background: rgba(20, 28, 66, 0.8); border: 1px solid var(--panel-line);
+  border-radius: 8px; font-size: 10px; font-weight: 800; color: var(--dim);
+  width: 34px; height: 26px;
+}
+
+/* elimination popup v2 (image + name) */
+.popup .pop-b { display: flex; align-items: center; gap: 7px; }
+
+/* countdown title + CTA dots + podium */
+.cd-t {
+  font-size: 20px; font-weight: 900; letter-spacing: 4px;
+  color: var(--neon);
+  text-shadow: 0 0 26px rgba(56, 182, 255, 0.7);
+  margin-bottom: 6px;
+  animation: fadeUp 0.5s both;
+}
+.cta-icon { color: var(--cta, var(--neon)); filter: drop-shadow(0 0 22px color-mix(in srgb, var(--cta, var(--neon)) 65%, transparent)); }
+.cta-dots { display: flex; gap: 7px; margin-top: 22px; }
+.cta-dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(140, 160, 220, 0.3); transition: background 0.3s ease, box-shadow 0.3s ease; }
+.cta-dots i.on { background: var(--cta, var(--neon)); box-shadow: 0 0 10px var(--cta, var(--neon)); }
+.win-podium { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; justify-content: center; max-width: 80%; }
+.pchip {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(20, 28, 66, 0.9);
+  border: 1px solid rgba(255, 207, 77, 0.45);
+  border-radius: 18px; padding: 4px 10px 4px 3px;
+  font-size: 12px; font-weight: 800;
+  animation: fadeUp 0.5s 0.5s both;
+}
+
+/* stream mode: keep a SMALL, subtle control overlay (never the full set) */
+.live.stream .controls { display: flex; opacity: 0.55; gap: 12px; }
+.live.stream .controls:hover, .live.stream .controls:active { opacity: 1; }
+.live.stream .controls button { width: 40px; height: 40px; }
+.live.stream .controls button.stop { border-color: rgba(255, 61, 113, 0.6); color: #ff8aa8; }
+.live.stream .hud-bottom { display: none; }
+.live.stream .winners { display: flex; }
+
+/* setup modal stream bits */
+.m-live {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 5px;
+  color: var(--hot); font-size: 10px; font-weight: 900; letter-spacing: 1.5px;
+}
+.m-row .swrow { flex-direction: column; align-items: stretch; gap: 8px; flex: 1; }
+.switem { display: flex; align-items: center; gap: 8px; color: var(--dim); font-size: 11px; font-weight: 800; letter-spacing: 0.8px; }
+.switem svg { color: var(--neon); flex: none; }
+.switem select { width: auto; flex: none; padding: 5px 8px; font-size: 12px; }
+.switem .tswitch { margin-left: auto; }

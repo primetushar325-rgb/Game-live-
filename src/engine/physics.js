@@ -1,21 +1,37 @@
 /* Pure 2D physics: circle-circle impulses + circular boundary with exit gap.
    Deterministic for a given RNG stream (QA relies on this). No DOM/audio. */
 
-import { PHYS } from '../config/defaults.js';
+import { PHYS, COLLISION_POWER } from '../config/defaults.js';
 import { SpatialGrid } from '../core/grid.js';
 
 const TAU = Math.PI * 2;
 
+/**
+ * phys config. ballSpeed (0.1..2.0) scales ALL motion: max speed, jitter,
+ * storms. collisionPower (LOW..EXTREME) scales the ball-ball restitution —
+ * independent of speed, so "FAST + EXTREME" is a legal combination.
+ */
 export function createPhys(settings, ballR, rng) {
+  const sp = clampNum(Number(settings.ballSpeed) || 1, 0.1, 2.0);
+  const rest = clampNum(
+    COLLISION_POWER[settings.collisionPower] ?? Number(settings.collision) ?? 0.95,
+    0.5, 1.35
+  );
+  const maxSpeed = (PHYS.maxSpeedBySpeed[settings.speed] || 780) * sp;
   return {
-    maxSpeed: PHYS.maxSpeedBySpeed[settings.speed] || 780,
-    restitution: Math.max(0.6, Math.min(1, Number(settings.collision) || 0.95)),
-    jitter: PHYS.jitter,
+    maxSpeed,
+    restitution: rest,
+    jitter: PHYS.jitter * sp,
     ballR,
     grid: new SpatialGrid(ballR * 2),
     stormT: rng.range(PHYS.stormEvery[0], PHYS.stormEvery[1]),
+    stormImpulse: PHYS.stormImpulse * (0.6 + 0.4 * sp),
+    /** substep subdivision for anti-tunneling: keeps per-step travel < 60% of radius */
+    subdiv: clampNum(Math.ceil((maxSpeed * PHYS.substep) / Math.max(6, ballR * 0.6)), 1, PHYS.maxSubdiv),
   };
 }
+
+function clampNum(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
 function collideBalls(a, b, phys, events) {
   const dx = b.x - a.x;
@@ -68,7 +84,11 @@ function resolveWall(b, arena, phys, events) {
   const dy = b.y - arena.cy;
   const d = Math.hypot(dx, dy);
   if (d < 1) return null;
-  const inGap = events ? b._inGap ?? arena.isInGap(b.x, b.y) : arena.isInGap(b.x, b.y);
+  // At high speed a ball can jump across a whole gap in one step — also
+  // sample the midpoint of the movement so quick passes are not missed.
+  const inGap =
+    arena.isInGap(b.x, b.y) ||
+    (b._px != null && arena.isInGap((b.x + b._px) / 2, (b.y + b._py) / 2));
   if (!inGap) {
     const lim = arena.R - b.r;
     if (d > lim) {
@@ -101,7 +121,7 @@ export function stepSubstep(balls, arena, phys, dt, events, rng) {
   phys.stormT -= dt;
   if (phys.stormT <= 0) {
     const ang = rng.next() * TAU;
-    const mag = PHYS.stormImpulse * (0.7 + rng.next() * 0.6);
+    const mag = (phys.stormImpulse || PHYS.stormImpulse) * (0.7 + rng.next() * 0.6);
     const sx = Math.cos(ang) * mag;
     const sy = Math.sin(ang) * mag;
     for (const b of balls) {
@@ -111,10 +131,12 @@ export function stepSubstep(balls, arena, phys, dt, events, rng) {
     phys.stormT = rng.range(PHYS.stormEvery[0], PHYS.stormEvery[1]);
   }
 
-  // --- jitter + integrate
+  // --- jitter + integrate (remember pre-move position for gap sampling)
   const ms = phys.maxSpeed;
   for (const b of balls) {
     if (b.eliminated) continue;
+    b._px = b.x;
+    b._py = b.y;
     const a = rng.next() * TAU;
     b.vx += Math.cos(a) * phys.jitter * dt;
     b.vy += Math.sin(a) * phys.jitter * dt;

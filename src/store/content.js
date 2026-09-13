@@ -64,19 +64,23 @@ export function createContent(storage) {
     if (DEFAULTS[cat] && data[cat] == null) data[cat] = DEFAULTS[cat].map((x) => ({ ...x }));
   }
 
-  function decorate(e) {
+  function decorate(e, cat) {
     let emoji = e.emoji || null;
     if (!emoji && e.country) emoji = countryEmoji(e.country);
-    return { ...e, emoji, color: e.color || null };
+    let image = e.image || null;
+    // Countries always ship with the bundled flag set (public/flags, MIT
+    // lipis/flag-icons) unless the user replaced the image.
+    if (!image && cat === 'countries' && e.code) image = `flags/${String(e.code).toLowerCase()}.png`;
+    return { ...e, emoji, image, color: e.color || null };
   }
 
   function entries(cat) {
     load();
     if (cat === 'countries') {
-      return COUNTRIES.map((c) => decorate({ ...c, ...(data.countries[c.id] || {}) }));
+      return COUNTRIES.map((c) => decorate({ ...c, ...(data.countries[c.id] || {}) }, 'countries'));
     }
     materialize(cat);
-    return (data[cat] || []).map(decorate);
+    return (data[cat] || []).map((e) => decorate(e, cat));
   }
 
   return {

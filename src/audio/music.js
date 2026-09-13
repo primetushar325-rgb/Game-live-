@@ -5,12 +5,35 @@
 
 import { audioCtx, muteState } from './audioManager.js';
 
+/* Multiple generative variants per state (NORMAL 1-4, SUSPENSE 1-3,
+   FINAL 1-3, VICTORY 1-3, CTA 1-2). All original, synthesized live.
+   roots = 8-step bass line, arps = melodic pool, pads = chord sets. */
 const B = {
-  NORMAL:   { bpm: 96,  kind: 'normal' },
-  SUSPENSE: { bpm: 72,  kind: 'suspense' },
-  FINAL:    { bpm: 132, kind: 'final' },
-  VICTORY:  { bpm: 116, kind: 'victory' },
-  CTA:      { bpm: 90,  kind: 'cta' },
+  NORMAL: [
+    { bpm: 96,  roots: [110, 110, 130.81, 130.81, 87.31, 87.31, 98, 98], arps: [440, 523.25, 587.33, 659.25, 880], pads: [[220, 261.63, 329.63], [174.61, 220, 261.63]], hat: 3 },
+    { bpm: 104, roots: [146.83, 146.83, 174.61, 174.61, 130.81, 130.81, 164.81, 164.81], arps: [587.33, 698.46, 783.99, 880, 1046.5], pads: [[293.66, 349.23, 440], [261.63, 293.66, 392]], hat: 3 },
+    { bpm: 88,  roots: [82.41, 82.41, 98, 98, 110, 110, 87.31, 87.31], arps: [329.63, 392, 440, 523.25, 659.25], pads: [[196, 246.94, 329.63], [174.61, 220, 261.63]], hat: 7 },
+    { bpm: 110, roots: [130.81, 130.81, 164.81, 164.81, 174.61, 174.61, 146.83, 146.83], arps: [523.25, 659.25, 783.99, 880, 1046.5], pads: [[261.63, 329.63, 392], [246.94, 311.13, 392]], hat: 3 },
+  ],
+  SUSPENSE: [
+    { bpm: 72,  roots: [36.71, 36.71, 36.71, 36.71, 39.2, 39.2, 36.71, 36.71], arps: [1568], pads: [[73.42, 98, 116.54]], hat: 7 },
+    { bpm: 64,  roots: [32.7, 32.7, 34.65, 34.65, 32.7, 32.7, 29.63, 29.63], arps: [1318.5], pads: [[65.41, 98, 130.81]], hat: 7 },
+    { bpm: 80,  roots: [36.71, 49, 36.71, 49, 43.65, 43.65, 36.71, 43.65], arps: [880, 1046.5], pads: [[73.42, 110, 146.83]], hat: 3 },
+  ],
+  FINAL: [
+    { bpm: 132, roots: [110, 110, 82.41, 110, 110, 82.41, 110, 82.41], arps: [440, 523.25, 659.25, 880, 659.25, 523.25], pads: [[220, 261.63]], hat: 3 },
+    { bpm: 144, roots: [123.47, 123.47, 146.83, 123.47, 123.47, 146.83, 110, 110], arps: [493.88, 587.33, 740, 987.77, 740, 587.33], pads: [[246.94, 293.66]], hat: 3 },
+    { bpm: 120, roots: [82.41, 82.41, 110, 110, 87.31, 87.31, 116.54, 116.54], arps: [392, 466.16, 587.33, 783.99, 587.33, 466.16], pads: [[196, 246.94]], hat: 7 },
+  ],
+  VICTORY: [
+    { bpm: 116, roots: [130.81, 98, 110, 130.81], arps: [523.25, 659.25, 783.99, 1046.5, 783.99, 659.25, 1046.5, 1318.5], pads: [[261.63, 329.63, 392], [196, 246.94, 293.66], [220, 261.63, 329.63], [261.63, 329.63, 392]], hat: 3 },
+    { bpm: 124, roots: [146.83, 110, 130.81, 146.83], arps: [587.33, 740, 880, 1174.66, 880, 740, 1174.66, 1479.98], pads: [[293.66, 369.99, 440], [220, 277.18, 329.63], [261.63, 329.63, 392], [293.66, 369.99, 440]], hat: 3 },
+    { bpm: 108, roots: [110, 130.81, 98, 130.81], arps: [440, 523.25, 659.25, 880, 659.25, 523.25, 880, 1046.5], pads: [[220, 261.63, 329.63], [261.63, 329.63, 392], [196, 246.94, 293.66], [261.63, 329.63, 392]], hat: 7 },
+  ],
+  CTA: [
+    { bpm: 90, roots: [220], arps: [523.25, 659.25], pads: [[220, 261.63, 329.63], [174.61, 220, 261.63], [261.63, 329.63, 392], [196, 246.94, 293.66]], hat: 0 },
+    { bpm: 96, roots: [196], arps: [493.88, 587.33], pads: [[196, 246.94, 329.63], [220, 277.18, 329.63], [174.61, 220, 261.63], [196, 246.94, 293.66]], hat: 7 },
+  ],
 };
 
 const A2 = 110, C3 = 130.81, E2 = 82.41, G2 = 98, F2 = 87.31, D2 = 73.42, D1 = 36.71;
@@ -65,44 +88,40 @@ function hatAt(c, when, dest) {
   o.stop(t0 + 0.05);
 }
 
-/* schedule one 16th-note step of the given generative state */
-function scheduleStep(kind, step, when, c, out) {
+/* schedule one 16th-note step of the given generative state+variant */
+function scheduleStep(st, v, step, when, c, out) {
   const s = step % 32;
-  if (kind === 'normal') {
-    const bassSeq = [A2, A2, A2, A2, C3, C3, C3, C3, F2, F2, F2, F2, E2, E2, G2, G2];
-    if (s % 2 === 0) noteAt(c, { f: bassSeq[s / 2], t: 0.16, type: 'sawtooth', g: 0.055, when, dest: out });
-    if (s === 0) padAt(c, [220, 261.63, 329.63], 2 * 60 / 96 / 4 * 15, 0.028, when, out);
-    if (s === 16) padAt(c, [174.61, 220, 261.63], 2 * 60 / 96 / 4 * 15, 0.028, when, out);
-    if (s % 4 === 2) {
-      const pent = [440, 523.25, 587.33, 659.25, 880];
-      noteAt(c, { f: pent[(s >> 1) % 5], t: 0.09, type: 'sine', g: 0.05, when, dest: out });
+  const spb = 60 / v.bpm / 4;
+  if (st === 'NORMAL') {
+    if (s % 2 === 0) noteAt(c, { f: v.roots[(s / 2) % 8], t: 0.16, type: 'sawtooth', g: 0.055, when, dest: out });
+    if (s === 0) padAt(c, v.pads[0], spb * 15, 0.028, when, out);
+    if (s === 16) padAt(c, v.pads[1] || v.pads[0], spb * 15, 0.028, when, out);
+    if (s % 4 === 2) noteAt(c, { f: v.arps[(s >> 1) % v.arps.length], t: 0.09, type: 'sine', g: 0.05, when, dest: out });
+    if (v.hat === 3 && s % 4 === 3) hatAt(c, when, out);
+  } else if (st === 'SUSPENSE') {
+    if (s % 4 === 0) noteAt(c, { f: v.roots[(s / 4) % 8], f1: Math.max(24, v.roots[(s / 4) % 8] * 0.7), t: 0.34, type: 'sine', g: 0.11, when, dest: out });
+    if (s === 0) padAt(c, v.pads[0], spb * 10, 0.032, when, out);
+    if (s % 8 === 6) noteAt(c, { f: v.arps[0], t: 0.22, type: 'sine', g: 0.02, when, dest: out });
+    if (v.hat === 3 && s % 8 === 4) hatAt(c, when, out);
+  } else if (st === 'FINAL') {
+    if (s % 2 === 0) noteAt(c, { f: v.roots[(s / 2) % 8], t: 0.11, type: 'sawtooth', g: 0.05, when, dest: out });
+    noteAt(c, { f: v.arps[s % v.arps.length], t: 0.07, type: 'square', g: 0.028, when, dest: out });
+    if (v.hat === 3 && s % 4 === 2) hatAt(c, when, out);
+    if (v.hat === 7 && s % 4 === 0) hatAt(c, when, out);
+    if (s === 0) padAt(c, v.pads[0], spb * 30, 0.02, when, out);
+  } else if (st === 'VICTORY') {
+    if (s % 4 === 0) {
+      noteAt(c, { f: v.roots[(s / 4) % 4] / 2, t: 0.2, type: 'triangle', g: 0.09, when, dest: out });
+      padAt(c, v.pads[(s / 4) % 4], spb * 7, 0.026, when, out);
     }
-    if (s % 4 === 3) hatAt(c, when, out);
-  } else if (kind === 'suspense') {
-    if (s % 4 === 0) noteAt(c, { f: D1, f1: 32, t: 0.32, type: 'sine', g: 0.11, when, dest: out });
-    if (s === 0) padAt(c, [D2, G2, 233.08], 3 * 60 / 72 / 4 * 10, 0.03, when, out);
-    if (s % 8 === 6) noteAt(c, { f: 1568, t: 0.22, type: 'sine', g: 0.02, when, dest: out });
-  } else if (kind === 'final') {
-    const bass16 = [A2, A2, E2, A2, A2, E2, A2, E2];
-    if (s % 1 === 0 && s % 2 === 0) noteAt(c, { f: bass16[(s / 2) % 8], t: 0.11, type: 'sawtooth', g: 0.05, when, dest: out });
-    const arp = [440, 523.25, 659.25, 880, 659.25, 523.25];
-    noteAt(c, { f: arp[s % 6], t: 0.07, type: 'square', g: 0.028, when, dest: out });
-    if (s % 4 === 2) hatAt(c, when, out);
-    if (s === 0) padAt(c, [220, 261.63], 60 / 132 / 4 * 30, 0.02, when, out);
-  } else if (kind === 'victory') {
-    const chordByBar = [[261.63, 329.63, 392], [196, 246.94, 293.66], [220, 261.63, 329.63], [261.63, 329.63, 392]];
-    if (s % 4 === 0) noteAt(c, { f: chordByBar[(s / 4) % 4][0] / 2, t: 0.2, type: 'triangle', g: 0.09, when, dest: out });
-    if (s % 4 === 0) padAt(c, chordByBar[(s / 4) % 4], 60 / 116 / 4 * 7, 0.026, when, out);
-    if (s % 2 === 0) {
-      const up = [523.25, 659.25, 783.99, 1046.5, 783.99, 659.25, 1046.5, 1318.5];
-      noteAt(c, { f: up[(s / 2) % 8], t: 0.1, type: 'triangle', g: 0.04, when, dest: out });
-    }
-    if (s % 4 === 2) hatAt(c, when, out);
-  } else if (kind === 'cta') {
-    const chord = [[220, 261.63, 329.63], [174.61, 220, 261.63], [261.63, 329.63, 392], [196, 246.94, 293.66]];
-    if (s === 0 || s === 16) padAt(c, chord[(s / 16) % 4], 60 / 90 / 4 * 15, 0.03, when, out);
-    if (s === 4 || s === 20) noteAt(c, { f: 523.25, t: 0.3, type: 'sine', g: 0.05, when, dest: out });
-    if (s === 12 || s === 28) noteAt(c, { f: 659.25, t: 0.3, type: 'sine', g: 0.045, when, dest: out });
+    if (s % 2 === 0) noteAt(c, { f: v.arps[(s / 2) % v.arps.length], t: 0.1, type: 'triangle', g: 0.04, when, dest: out });
+    if (v.hat === 3 && s % 4 === 2) hatAt(c, when, out);
+    if (v.hat === 7 && s % 4 === 0) hatAt(c, when, out);
+  } else if (st === 'CTA') {
+    if (s === 0 || s === 16) padAt(c, v.pads[(s / 16) % 4], spb * 15, 0.03, when, out);
+    if (s === 4 || s === 20) noteAt(c, { f: v.arps[0], t: 0.3, type: 'sine', g: 0.05, when, dest: out });
+    if (s === 12 || s === 28) noteAt(c, { f: v.arps[1], t: 0.3, type: 'sine', g: 0.045, when, dest: out });
+    if (v.hat === 7 && s % 8 === 4) hatAt(c, when, out);
   }
 }
 
@@ -157,6 +176,8 @@ export function createMusic(settings, bus) {
   let step = 0;
   let nextT = 0;
   let state = 'OFF';
+  let variant = 0;
+  let lastVariant = {}; // state -> last used variant (avoid repeats)
   let buffers = new Map(); // state -> AudioBuffer
   let currentCustom = null; // {source, gain, state}
   let crossfade = null;
@@ -172,7 +193,8 @@ export function createMusic(settings, bus) {
   function vol() {
     if (muteState.on) return 0;
     const s = settings.get();
-    return s.musicOn ? Math.pow(s.musicVolume / 100, 1.4) * 0.9 : 0;
+    const master = (s.masterVolume ?? 90) / 100;
+    return s.musicOn ? Math.pow(s.musicVolume / 100, 1.4) * 0.9 * master : 0;
   }
   function applyVol() {
     const c = audioCtx();
@@ -182,11 +204,12 @@ export function createMusic(settings, bus) {
   function tick() {
     const c = audioCtx();
     if (!c || !outGain) return;
-    const cfg = B[state];
-    if (!cfg) return;
+    const variants = B[state];
+    if (!variants) return;
+    const cfg = variants[variant % variants.length];
     const spb = 60 / cfg.bpm / 4;
     while (nextT < c.currentTime + 0.14) {
-      if (nextT > c.currentTime - 0.02) scheduleStep(cfg.kind, step, nextT, c, outGain);
+      if (nextT > c.currentTime - 0.02) scheduleStep(state, cfg, step, nextT, c, outGain);
       step = (step + 1) % 32;
       nextT += spb;
     }
@@ -199,10 +222,30 @@ export function createMusic(settings, bus) {
   function startGenerative(st) {
     const c = audioCtx();
     if (!c) return;
+    const variants = B[st];
+    if (!variants) return;
+    // pick a variant different from the last one used for this state
+    const prev = lastVariant[st];
+    let v;
+    if (variants.length > 1) {
+      do { v = Math.floor(Math.random() * variants.length); } while (v === prev);
+    } else v = 0;
+    lastVariant[st] = v;
+    variant = v;
     state = st;
     step = 0;
     nextT = c.currentTime + 0.08;
     if (!timer) timer = setInterval(tick, 30);
+  }
+
+  /** short dip so state changes crossfade instead of cutting */
+  function dip() {
+    const c = audioCtx();
+    if (!c || !outGain) return;
+    const v = vol();
+    outGain.gain.cancelScheduledValues(c.currentTime);
+    outGain.gain.setTargetAtTime(Math.max(0.0002, v * 0.25), c.currentTime, 0.08);
+    outGain.gain.setTargetAtTime(v, c.currentTime + 0.22, 0.12);
   }
 
   function stopCustom(fade = 0.4) {
@@ -262,6 +305,7 @@ export function createMusic(settings, bus) {
       return;
     }
     stopCustom(0.3);
+    if (state !== 'OFF') dip();
     startGenerative(st);
   }
 

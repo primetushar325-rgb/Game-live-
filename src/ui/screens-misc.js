@@ -3,6 +3,7 @@
 import { fmtTime } from '../audio/audioManager.js';
 import { CTA_TEMPLATES } from '../data/ctas.js';
 import { M } from '../engine/match.js';
+import { icon } from './icons.js';
 
 export function renderHistory(app) {
   app.clearRoot();
@@ -11,7 +12,7 @@ export function renderHistory(app) {
   el.className = 'screen history';
   const items = history.list();
   el.innerHTML = `
-    <div class="s-head"><button class="btn ghost back" id="hBack">←</button><h1>MATCH HISTORY</h1><span></span></div>
+    <div class="s-head"><button class="btn ghost back" id="hBack">${icon('back', 16)}</button><h1>MATCH HISTORY</h1><span></span></div>
     <div class="s-scroll">
       ${items.length ? '' : '<div class="c-empty">No matches yet — run a battle first!</div>'}
       ${items.map((h) => `
@@ -41,7 +42,7 @@ export function renderTest(app) {
   const el = document.createElement('div');
   el.className = 'screen test';
   el.innerHTML = `
-    <div class="s-head"><button class="btn ghost back" id="tBack">←</button><h1>TEST MODE</h1><span></span></div>
+    <div class="s-head"><button class="btn ghost back" id="tBack">${icon('back', 16)}</button><h1>TEST MODE</h1><span></span></div>
     <div class="s-scroll">
       <div class="t-status" id="tStatus"></div>
       <div class="t-grid">

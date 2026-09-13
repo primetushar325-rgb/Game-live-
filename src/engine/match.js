@@ -4,6 +4,7 @@
 
 import { RNG, randomSeed } from '../core/rng.js';
 import { PHYS, CATEGORIES, CATEGORY_META } from '../config/defaults.js';
+import { ctaSequence } from '../data/ctas.js';
 import { Arena } from './arena.js';
 import { spawnBalls, ballRadius } from './balls.js';
 import { stepSubstep, createPhys, avgSpeed } from './physics.js';
@@ -88,7 +89,8 @@ export class Match {
           : `Not enough enabled contestants for ${cfg.category} (need 2+, have ${pool?.length ?? 0}). Add or enable contestants in the Content Manager.`
       );
     }
-    const rounds = buildRounds(cfg.preset || s.tournamentPreset, cfg.count ?? s.ballCount, pool.length);
+    const winnerCount = Math.max(1, Math.min(10, Math.round(cfg.winnerCount ?? s.winnerCount) || 1));
+    const rounds = buildRounds(cfg.preset || s.tournamentPreset, cfg.count ?? s.ballCount, pool.length, winnerCount);
     if (!rounds) throw new Error('Invalid tournament configuration — not enough contestants.');
 
     this.resolved = resolved;
@@ -101,18 +103,22 @@ export class Match {
       id: cfg.id ?? this.assignId(),
       seed: cfg.seed ?? randomSeed(),
       titleOverride: cfg.title || null,
+      winnerCount,
     };
     this.rounds = rounds;
     this.roundIndex = 0;
     this.qualified = [];
     this.eliminated = [];
     this.winner = null;
+    this.winners = [];
     this.cta = null;
     this.elapsed = 0;
     this.finalTwoAnnounced = false;
     this.musicState = null;
     this.rng = new RNG(this.cfg.seed);
     this.acc = 0;
+    // RANDOM_MATCH: one gap layout for the whole match (deterministic per seed)
+    this.gapBase = s.gapPosition === 'RANDOM_MATCH' ? this.rng.range(0, Math.PI * 2) : null;
     this.buildRound(0);
     this.state = M.COUNTDOWN;
     this.countdownMax = Math.max(1, s.countdown);
@@ -131,7 +137,10 @@ export class Match {
     } else {
       pool = this.qualified.map((q) => ({ ...q.c }));
     }
-    this.arena = new Arena(s, this.rng);
+    const baseAngle = s.gapPosition === 'RANDOM_ROUND'
+      ? this.rng.range(0, Math.PI * 2)
+      : this.gapBase; // null => FIXED (arena anchors at top)
+    this.arena = new Arena(s, this.rng, { baseAngle });
     const R = this.arena.R;
     const r = ballRadius(round.start, R);
     this.phys = createPhys(s, r, this.rng);
@@ -163,6 +172,8 @@ export class Match {
       seed: this.cfg?.seed ?? 0,
       autoLive: this.cfg?.autoLive ?? false,
       gapAngle: this.arena?.gapAngle ?? 0,
+      gapCount: this.arena?.gapCount ?? 1,
+      winnerCount: this.cfg?.winnerCount ?? 1,
     };
   }
 
@@ -185,9 +196,11 @@ export class Match {
   update(frameDt) {
     if (this.state === M.PAUSED || this.state === M.IDLE || this.state === M.OVER) return;
     this.acc = Math.min(this.acc + frameDt, PHYS.maxFrameDt);
-    const SUB = PHYS.substep;
+    // adaptive subdivision: at INSANE speeds the substep gets smaller so a
+    // fast ball can never tunnel through the boundary in one step
+    const SUB = PHYS.substep / (this.phys?.subdiv || 1);
     let guard = 0;
-    while (this.acc >= SUB && guard++ < 48) {
+    while (this.acc >= SUB && guard++ < 120) {
       this.substep(SUB);
       this.acc -= SUB;
     }
@@ -228,7 +241,7 @@ export class Match {
             this.state = M.WINNER;
             this.stateT = this.now().winnerDuration;
             this.setMusic('VICTORY');
-            this.bus.emit('winner:show', { winner: this.winner });
+            this.bus.emit('winner:show', { winner: this.winner, winners: this.winners || this.qualified.map((b) => b.c) });
           }
         }
         break;
@@ -236,14 +249,28 @@ export class Match {
         this.stateT -= dt;
         if (this.stateT <= 0) {
           this.state = M.CTA;
-          this.stateT = Math.max(1, Number(this.now().ctaDuration) || 8);
-          this.cta = this.pickCta();
+          this.stateTMax = Math.max(1, Number(this.now().ctaDuration) || 8);
+          this.stateT = this.stateTMax;
+          const sc = this.now().stream || {};
+          this.ctaSeq = ctaSequence(this.resolved || 'random', {
+            commentCta: sc.commentCta !== false,
+            subscribeCta: sc.subscribeCta !== false,
+          });
+          this.cta = this.ctaSeq[0] || this.pickCta();
+          this.ctaStep = -1;
+          this.emitCtaStep(0);
           this.setMusic('CTA');
-          this.bus.emit('cta:start', { cta: this.cta, t: this.stateT });
+          this.bus.emit('cta:start', { cta: this.cta, seq: this.ctaSeq, t: this.stateT });
         }
         break;
       case M.CTA:
         this.stateT -= dt;
+        // advance through the CTA sequence (comment -> subscribe -> like/follow)
+        if (this.ctaSeq && this.ctaSeq.length > 1 && this.stateTMax > 0) {
+          const idx = Math.min(this.ctaSeq.length - 1,
+            Math.floor((1 - Math.max(0, this.stateT) / this.stateTMax) * this.ctaSeq.length));
+          if (idx !== this.ctaStep) this.emitCtaStep(idx);
+        }
         if (this.stateT <= 0) {
           this.state = M.INTERMISSION;
           this.stateT = Math.max(1, this.now().intermission);
@@ -353,10 +380,9 @@ export class Match {
       this.bus.emit('final:two', {});
     }
 
-    // music tension
-    const isFinal = this.roundIndex === this.rounds.length - 1;
-    if (isFinal && this.left <= Math.max(3, this.target + 5)) this.setMusic('SUSPENSE');
-    else if (isFinal && this.left <= 2) this.setMusic('FINAL');
+    // dynamic music: tension scales as the field shrinks (any round)
+    if (this.left === 2 && this.target === 1) this.setMusic('FINAL');
+    else if (this.left <= Math.max(3, this.target + 2)) this.setMusic('SUSPENSE');
 
     // end conditions
     if (this.left <= this.target) {
@@ -372,8 +398,10 @@ export class Match {
     const survivors = this.balls.filter((b) => !b.eliminated);
     this.qualified = survivors;
     const isFinal = this.roundIndex === this.rounds.length - 1;
-    if (isFinal && this.target === 1 && survivors.length === 1) {
-      this.winner = survivors[0].c;
+    if (isFinal) {
+      // last survivor (or first of the podium when winnerCount > 1) is THE winner
+      this.winner = survivors[0]?.c || this.winner;
+      this.winners = survivors.slice(0, this.target).map((b) => b.c);
     }
     this.state = M.ROUND_RESULT;
     this.stateT = isFinal ? 2.4 : 3.4;
@@ -383,6 +411,7 @@ export class Match {
       round: this.roundIndex + 1,
       totalRounds: this.rounds.length,
       winner: this.winner,
+      winners: isFinal ? this.winners : [],
     });
   }
 
@@ -409,6 +438,13 @@ export class Match {
     }
     this.bus.emit('match:timeup', {});
     this.endRound();
+  }
+
+  emitCtaStep(idx) {
+    if (!this.ctaSeq) return;
+    this.ctaStep = idx;
+    this.cta = this.ctaSeq[idx] || this.cta;
+    this.bus.emit('cta:step', { index: idx, cta: this.cta, total: this.ctaSeq.length });
   }
 
   pickCta() {
@@ -509,14 +545,16 @@ export class Match {
       }
     }
 
-    if (isFinal && this.target === 1) {
+    if (isFinal) {
       this.winner = w;
-      this.left = 1;
+      this.winners = qualified.slice(0, this.target);
+      this.left = qualified.length;
       this.state = M.ROUND_RESULT;
       this.stateT = 1.6;
       this.bus.emit('round:end', {
-        qualified: [w], isFinal: true, round: this.roundIndex + 1,
-        totalRounds: this.rounds.length, winner: w,
+        qualified: qualified.slice(0, this.target), isFinal: true,
+        round: this.roundIndex + 1, totalRounds: this.rounds.length,
+        winner: w, winners: this.winners,
       });
     } else {
       this.qualified = qualified.map((c) => ({ c }));

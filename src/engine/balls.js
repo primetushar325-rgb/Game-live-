@@ -16,7 +16,8 @@ export function ballRadius(count, R) {
 export function spawnBalls(pool, count, arena, ballR, settings, rng) {
   const balls = [];
   const R0 = arena.R - 2.8 * ballR;
-  const startSpeed = PHYS.startSpeedBySpeed[settings.speed] || 240;
+  const sp = Math.max(0.1, Math.min(2, Number(settings.ballSpeed) || 1));
+  const startSpeed = (PHYS.startSpeedBySpeed[settings.speed] || 240) * sp;
   for (let i = 0; i < count; i++) {
     const t = count === 1 ? 0 : i / (count - 1);
     const rad = R0 * Math.sqrt(t) * 0.94;

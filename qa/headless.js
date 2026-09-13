@@ -269,6 +269,126 @@ section('PERFORMANCE (195 balls, HIGH speed, 30s)');
 }
 function PHYS_SUB() { return 1 / 120; }
 
+/* ---------------- 10. V2 physics matrix: gaps × speed × collision ---------------- */
+section('V2 MATRIX (gaps 1-4 × speed SLOW..INSANE × collision, 25s each)');
+{
+  let cases = 0;
+  let worst = { esc: 0, nan: 0, stuck: 0 };
+  for (const gaps of [1, 2, 3, 4]) {
+    for (const ballSpeed of [0.5, 1.0, 1.5, 2.0]) {
+      for (const collisionPower of ['NORMAL', 'EXTREME']) {
+        const env = makeEnv({
+          matchDuration: 600, gapSize: 46, speed: 'NORMAL', ballCount: 50,
+          countdown: 1, winnerDuration: 1, ctaDuration: 1, intermission: 1,
+          announceEliminations: false,
+          ballSpeed, collisionPower, gapCount: gaps,
+          gapPosition: 'RANDOM_MATCH', gapRotate: false,
+        });
+        const m = env.match;
+        m.startMatch({ category: 'countries', count: 50, preset: 'SINGLE', seed: 900 + gaps * 10 + ballSpeed * 4 + (collisionPower === 'EXTREME' ? 2 : 0), id: 1, autoLive: false });
+        const R = m.arena.R;
+        let NaNs = 0, escapes = 0, steps = 0;
+        let lowStreak = 0, maxLow = 0;
+        const f = 0.125;
+        for (let t = 0; t < 25; t += f) {
+          m.update(f);
+          steps++;
+          if (m.state === M.OVER || m.state === M.INTERMISSION) break;
+          if (steps % 8 === 0) {
+            let low = 0;
+            for (const b of m.balls) {
+              if (b.eliminated) continue;
+              if (!Number.isFinite(b.x) || !Number.isFinite(b.y) || !Number.isFinite(b.vx) || !Number.isFinite(b.vy)) NaNs++;
+              const d = Math.hypot(b.x - m.arena.cx, b.y - m.arena.cy);
+              if (!m.arena.isInGap(b.x, b.y) && !m.arena.isInGap((b.x + (b._px ?? b.x)) / 2, (b.y + (b._py ?? b.y)) / 2) && d > R - b.r + 2) escapes++;
+              low += Math.hypot(b.vx, b.vy);
+            }
+            if (m.state === M.BATTLE && low / Math.max(1, m.left) < 20) lowStreak++;
+            else lowStreak = 0;
+            maxLow = Math.max(maxLow, lowStreak);
+          }
+        }
+        cases++;
+        worst.nan = Math.max(worst.nan, NaNs);
+        worst.esc = Math.max(worst.esc, escapes);
+        worst.stuck = Math.max(worst.stuck, maxLow);
+        if (NaNs || escapes || maxLow > 3) {
+          console.log(`  !! case gaps=${gaps} speed=${ballSpeed} coll=${collisionPower}: NaNs=${NaNs} esc=${escapes} stuck=${maxLow} state=${m.state}`);
+        }
+      }
+    }
+  }
+  check(`matrix: ${cases} cases, no NaN anywhere`, worst.nan === 0, `worst NaNs=${worst.nan}`);
+  check(`matrix: no boundary escapes (1-4 gaps)`, worst.esc === 0, `worst escapes=${worst.esc}`);
+  check(`matrix: no permanently stuck arenas`, worst.stuck <= 3, `worst low-streak=${worst.stuck}`);
+}
+
+/* ---------------- 11. 195-ball INSANE 4-gap stress ---------------- */
+section('STRESS: 195 balls, INSANE speed, 4 gaps, EXTREME');
+{
+  const env = makeEnv({
+    matchDuration: 600, gapSize: 46, speed: 'NORMAL', ballCount: 195,
+    countdown: 1, winnerDuration: 1, ctaDuration: 1, intermission: 1,
+    announceEliminations: false,
+    ballSpeed: 2.0, collisionPower: 'EXTREME', gapCount: 4,
+    gapPosition: 'RANDOM_MATCH',
+  });
+  const m = env.match;
+  const t0 = Date.now();
+  m.startMatch({ category: 'countries', count: 195, preset: 'SINGLE', seed: 31337, id: 1, autoLive: false });
+  const R = m.arena.R;
+  let NaNs = 0, escapes = 0, subs = 0;
+  for (let t = 0; t < 30; t += 0.125) {
+    m.update(0.125);
+    subs++;
+    if (m.state === M.OVER || m.state === M.INTERMISSION) break;
+  }
+  let bad = 0;
+  for (const b of m.balls) {
+    if (b.eliminated) continue;
+    if (!Number.isFinite(b.x) || !Number.isFinite(b.y)) bad++;
+    const d = Math.hypot(b.x - m.arena.cx, b.y - m.arena.cy);
+    if (!m.arena.isInGap(b.x, b.y) && d > R - b.r + 2) escapes++;
+  }
+  console.log(`  info 195 @ INSANE/4-gap: ${subs} substep-frames in ${Date.now() - t0}ms, state=${m.state}, left=${m.left}`);
+  check('stress: no NaN', bad === 0, `bad=${bad}`);
+  check('stress: no escapes', escapes === 0, `escapes=${escapes}`);
+}
+
+/* ---------------- 12. STREAM MODE long run: 100 consecutive matches ---------------- */
+section('STREAM MODE LONG RUN — 100 consecutive country battles');
+{
+  const env = makeEnv({
+    matchDuration: 10, gapSize: 60, speed: 'NORMAL', ballCount: 30,
+    countdown: 1, winnerDuration: 1, ctaDuration: 1, intermission: 1,
+    announceEliminations: false,
+    ballSpeed: 1.0, collisionPower: 'NORMAL', gapCount: 2,
+    gapPosition: 'RANDOM_MATCH',
+  });
+  const { match, bus, history } = env;
+  const winnerNames = [];
+  bus.on('round:end', (d) => {
+    if (d.isFinal && d.winner) { winnerNames.push(d.winner.name); history.add(match.result()); }
+  });
+  let ids = [];
+  bus.on('match:start', (i) => ids.push(i.id));
+  match.startMatch({ category: 'countries', count: 30, preset: 'SINGLE', autoLive: true });
+  const f = 0.125;
+  let t = 0;
+  const cap = 4 * 60 * 60;
+  while (history.list().length < 100 && t < cap) { match.update(f); t += f; }
+  const done = history.list();
+  check('100 matches completed', done.length >= 100, `done=${done.length} sim=${(t / 60).toFixed(0)}min`);
+  check('every match has a winner', done.every((d) => d.winner?.name));
+  check('match ids strictly increase (no double-start)', ids.every((v, i) => i === 0 || v > ids[i - 1]), `ids sample: ${ids.slice(0, 5).join(',')}…`);
+  const unique = new Set(winnerNames).size;
+  check('winners vary (seeded randomness)', unique >= Math.min(40, winnerNames.length * 0.3), `unique=${unique}/${winnerNames.length}`);
+  process.gc?.();
+  const mem = process.memoryUsage().heapUsed;
+  console.log(`  info 100 matches; heap now ${(mem / 1048576).toFixed(1)}MB`);
+  check('heap bounded over 100 matches (< 200MB)', mem < 200 * 1048576, `${(mem / 1048576).toFixed(1)}MB`);
+}
+
 /* ---------------- summary ---------------- */
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${'='.repeat(50)}`);

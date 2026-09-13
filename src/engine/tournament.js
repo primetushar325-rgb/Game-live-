@@ -4,17 +4,19 @@
    SINGLE= one round straight to a winner
  */
 
-export function buildRounds(preset, startCount, poolSize) {
+export function buildRounds(preset, startCount, poolSize, winners = 1) {
   const start = Math.max(2, Math.min(Math.round(startCount) || 2, poolSize));
+  const w = Math.max(1, Math.min(10, Math.round(winners) || 1));
   let qs;
   if (preset === 'SINGLE') {
-    qs = [1];
+    qs = [w];
   } else if (preset === 'SCALE') {
-    qs = [0.36, 0.15, 0.051].map((f) => Math.max(2, Math.round(start * f)));
-    qs.push(1);
+    qs = [0.36, 0.15, 0.051].map((f) => Math.max(Math.max(2, w + 1), Math.round(start * f)));
+    qs.push(w);
   } else { // FULL (default)
     const k = start / 195;
-    qs = [70, 30, 10, 1].map((q) => Math.max(1, Math.round(q * k)));
+    qs = [70, 30, 10, w].map((q) => Math.max(1, Math.round(q * k)));
+    qs[qs.length - 1] = Math.max(1, w);
   }
 
   // sanitize: strictly decreasing, each in [1, prev-1]

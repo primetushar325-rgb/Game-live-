@@ -1,7 +1,8 @@
 /* Splash + Home + pre-match setup modal. */
 
-import { logoFull, logoIcon, LOGO_ICON_FILE } from './logo.js';
-import { CATEGORIES, CATEGORY_META, COUNT_PRESETS, VERSION } from '../config/defaults.js';
+import { logoFull, logoIcon } from './logo.js';
+import { icon } from './icons.js';
+import { CATEGORIES, CATEGORY_META, COUNT_PRESETS, SPEED_PRESETS, COLLISION_POWER, VERSION } from '../config/defaults.js';
 
 export function renderSplash(app) {
   app.clearRoot();
@@ -17,18 +18,18 @@ export function renderSplash(app) {
 }
 
 const HOME_BTNS = [
-  { id: 'quick', label: 'QUICK BATTLE', icon: '⚡', cat: 'quick' },
-  { id: 'countries', label: 'COUNTRY BATTLE', icon: '🌐', cat: 'countries' },
-  { id: 'youtubers', label: 'YOUTUBER BATTLE', icon: '▶', cat: 'youtubers' },
-  { id: 'football', label: 'FOOTBALL BATTLE', icon: '⚽', cat: 'football' },
-  { id: 'social', label: 'SOCIAL MEDIA', icon: '📱', cat: 'social' },
-  { id: 'games', label: 'GAMING', icon: '🎮', cat: 'games' },
-  { id: 'custom', label: 'CUSTOM BATTLE', icon: '✚', cat: 'custom' },
-  { id: 'random', label: 'RANDOM BATTLE', icon: '🎲', cat: 'random' },
-  { id: 'tournament', label: 'TOURNAMENT', icon: '🏆', cat: 'tournament' },
-  { id: 'autolive', label: 'AUTO LIVE', icon: '🔴', cat: 'autolive', hot: true },
-  { id: 'content', label: 'CONTENT MANAGER', icon: '🗂' },
-  { id: 'settings', label: 'SETTINGS', icon: '⚙' },
+  { id: 'quick', label: 'QUICK BATTLE', ic: 'bolt', cat: 'quick' },
+  { id: 'countries', label: 'COUNTRY BATTLE', ic: 'globe', cat: 'countries' },
+  { id: 'youtubers', label: 'YOUTUBER BATTLE', ic: 'youtube', cat: 'youtubers' },
+  { id: 'football', label: 'FOOTBALL BATTLE', ic: 'football', cat: 'football' },
+  { id: 'social', label: 'SOCIAL MEDIA', ic: 'phone', cat: 'social' },
+  { id: 'games', label: 'GAMING', ic: 'gamepad', cat: 'games' },
+  { id: 'custom', label: 'CUSTOM BATTLE', ic: 'userplus', cat: 'custom' },
+  { id: 'random', label: 'RANDOM BATTLE', ic: 'shuffle', cat: 'random' },
+  { id: 'tournament', label: 'TOURNAMENT', ic: 'trophy', cat: 'tournament' },
+  { id: 'stream', label: 'STREAM MODE', ic: 'live', cat: 'stream', hot: true },
+  { id: 'content', label: 'CONTENT MANAGER', ic: 'folder' },
+  { id: 'settings', label: 'SETTINGS', ic: 'gear' },
 ];
 
 export function renderHome(app) {
@@ -43,14 +44,14 @@ export function renderHome(app) {
     <div class="home-grid">
       ${HOME_BTNS.map((b) => `
         <button class="hbtn ${b.hot ? 'hot' : ''}" data-id="${b.id}">
-          <span class="hicon">${b.icon}</span>${b.label}
+          <span class="hicon">${icon(b.ic, 17)}</span>${b.label}
           ${b.hot ? '<span class="live-dot"></span>' : ''}
         </button>`).join('')}
     </div>
     <div class="home-foot">
-      <button class="linkbtn" data-id="history">MATCH HISTORY${hist.length ? ` (${hist.length})` : ''}</button>
+      <button class="linkbtn" data-id="history">${icon('history', 13)} MATCH HISTORY${hist.length ? ` (${hist.length})` : ''}</button>
       <span class="ver">v${VERSION}</span>
-      <button class="linkbtn" data-id="test">TEST MODE</button>
+      <button class="linkbtn" data-id="test">${icon('flask', 13)} TEST MODE</button>
     </div>
   `;
   app.root.appendChild(el);
@@ -76,8 +77,8 @@ function onHomeBtn(app, id) {
     case 'tournament':
       showSetup(app, { category: 'countries', preset: 'FULL', tournament: true });
       break;
-    case 'autolive':
-      showSetup(app, { category: 'random', preset: s.tournamentPreset, autoLive: true });
+    case 'stream':
+      showSetup(app, { category: 'countries', stream: true, preset: 'SINGLE' });
       break;
     case 'content':
       app.navigate('content');
@@ -94,15 +95,18 @@ function onHomeBtn(app, id) {
   }
 }
 
-export function showSetup(app, { category, preset, autoLive = false, tournament = false }) {
+export function showSetup(app, { category, preset, autoLive = false, tournament = false, stream = false }) {
   const { settings, content, root } = app;
   const s = settings.get();
-  // random stays random (no category picker); quick/categorized battles get a picker
-  const catChoices = category === 'random'
-    ? []
-    : category === 'custom'
-      ? ['custom']
-      : CATEGORIES;
+  const sm = s.stream || {};
+  // stream: user picks ONE category (or random) and it loops forever in that category
+  const catChoices = stream
+    ? [...CATEGORIES.filter((c) => c !== 'custom' || content.listBattles().length > 0), 'random']
+    : category === 'random'
+      ? []
+      : category === 'custom'
+        ? ['custom']
+        : CATEGORIES;
 
   const battles = category === 'custom' || catChoices.includes('custom') ? content.listBattles() : [];
   const defaultCount = category === 'countries'
@@ -113,12 +117,12 @@ export function showSetup(app, { category, preset, autoLive = false, tournament 
   modal.className = 'modal-wrap';
   modal.innerHTML = `
     <div class="modal">
-      <div class="m-head">${logoIcon(40)}<span id="mTitle">SETUP</span></div>
+      <div class="m-head">${logoIcon(40)}<span id="mTitle">SETUP</span>${stream ? `<span class="m-live">${icon('live', 12)} STREAM</span>` : ''}</div>
       <div class="m-body">
         ${catChoices.length > 1 ? `
         <div class="m-row">
           <label>CATEGORY</label>
-          <select id="mCat">${catChoices.map((c) => `<option value="${c}" ${c === category ? 'selected' : ''}>${CATEGORY_META[c].banner}</option>`).join('')}</select>
+          <select id="mCat">${catChoices.map((c) => `<option value="${c}" ${c === category ? 'selected' : ''}>${CATEGORY_META[c]?.banner || c.toUpperCase()}</option>`).join('')}</select>
         </div>` : ''}
         <div id="mBattleRow" style="display:none">
           <div class="m-row"><label>BATTLE</label>
@@ -143,11 +147,57 @@ export function showSetup(app, { category, preset, autoLive = false, tournament 
             <button data-p="SINGLE" class="${preset === 'SINGLE' ? 'on' : ''}">1 WINNER</button>
           </div>
         </div>
-        ${autoLive ? `<div class="m-warn">🔴 AUTO LIVE will run matches forever until you stop it.</div>` : ''}
+        <div class="m-row">
+          <label>WINNER COUNT</label>
+          <div class="seg" id="mWinners">
+            ${[1, 5, 10].map((w) => `<button data-w="${w}" class="${(s.winnerCount || 1) === w ? 'on' : ''}">${w} WINNER${w > 1 ? 'S' : ''}</button>`).join('')}
+          </div>
+        </div>
+        <div class="m-row">
+          <label>BALL SPEED</label>
+          <div class="seg" id="mSpeed">
+            ${Object.entries(SPEED_PRESETS).map(([k, v]) => `<button data-v="${k}" data-pct="${Math.round(v * 100)}" class="${s.ballSpeed === v ? 'on' : ''}">${k}</button>`).join('')}
+          </div>
+          <div class="m-row"><label>FINE TUNE</label>
+            <div class="volrow"><input type="range" id="mSpeedPct" min="10" max="200" step="5" value="${Math.round((s.ballSpeed || 1) * 100)}"><output id="mSpeedPctO">${Math.round((s.ballSpeed || 1) * 100)}%</output></div>
+          </div>
+        </div>
+        <div class="m-row">
+          <label>COLLISION POWER</label>
+          <div class="seg" id="mColl">
+            ${Object.keys(COLLISION_POWER).map((k) => `<button data-v="${k}" class="${(s.collisionPower || 'NORMAL') === k ? 'on' : ''}">${k}</button>`).join('')}
+          </div>
+        </div>
+        <div class="m-row">
+          <label>EXIT GAPS</label>
+          <div class="seg" id="mGaps">
+            ${[1, 2, 3, 4].map((n) => `<button data-n="${n}" class="${(s.gapCount || 1) === n ? 'on' : ''}">${n} GAP${n > 1 ? 'S' : ''}</button>`).join('')}
+          </div>
+          <div class="seg" id="mGapPos">
+            ${['FIXED', 'RANDOM MATCH', 'RANDOM ROUND'].map((p) => `<button data-v="${p.replace(' ', '_')}" class="${(s.gapPosition || 'RANDOM_MATCH') === p.replace(' ', '_') ? 'on' : ''}">${p}</button>`).join('')}
+          </div>
+        </div>
+        <div class="m-row">
+          <label>ARENA / TIME</label>
+          <div class="mrow2">
+            <select id="mArena">${['S', 'M', 'L'].map((a) => `<option value="${a}" ${a === s.arenaSize ? 'selected' : ''}>ARENA ${a}</option>`).join('')}</select>
+            <select id="mDur">${[5, 10, 15, 30, 45].map((d) => `<option value="${d}" ${Math.round(s.matchDuration / 60) === d ? 'selected' : ''}>${d} MIN</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="m-row">
+          <label>STREAM OPTIONS</label>
+          <div class="mrow2 swrow">
+            <span class="switem">${icon('timer', 13)} COUNTDOWN <select id="mCd">${[3, 5, 10].map((c) => `<option value="${c}" ${Number(sm.streamCountdown || 3) === c ? 'selected' : ''}>${c}s</option>`).join('')}</select></span>
+            <span class="switem">${icon('comment', 13)} COMMENT CTA <button class="tswitch ${sm.commentCta !== false ? 'on' : ''}" id="mCtaCmt"></button></span>
+            <span class="switem">${icon('youtube', 13)} SUBSCRIBE CTA <button class="tswitch ${sm.subscribeCta !== false ? 'on' : ''}" id="mCtaSub"></button></span>
+            <span class="switem">${icon('trophy', 13)} HISTORY <select id="mWinN">${[5, 10, 20].map((n) => `<option value="${n}" ${Number(sm.winnerHistoryCount || 5) === n ? 'selected' : ''}>${n}</option>`).join('')}</select></span>
+          </div>
+        </div>
+        ${stream || autoLive ? `<div class="m-warn">${icon('live', 14)} ${stream ? 'STREAM MODE runs matches automatically, forever, in the selected category. Stop it with the STOP button (or triple-tap top-right).' : 'AUTO LIVE will run matches forever until you stop it.'}</div>` : ''}
       </div>
       <div class="m-foot">
-        <button class="btn ghost" id="mCancel">CANCEL</button>
-        <button class="btn primary" id="mStart">${autoLive ? 'START AUTO LIVE' : tournament ? 'START TOURNAMENT' : 'START BATTLE'}</button>
+        <button class="btn ghost" id="mCancel">${icon('close', 14)} CANCEL</button>
+        <button class="btn primary" id="mStart">${stream ? `${icon('live', 15)} START STREAM` : autoLive ? 'START AUTO LIVE' : tournament ? 'START TOURNAMENT' : 'START BATTLE'}</button>
       </div>
     </div>
   `;
@@ -157,11 +207,16 @@ export function showSetup(app, { category, preset, autoLive = false, tournament 
   let selCat = category;
   let selCount = defaultCount;
   let selPreset = preset;
+  let selWinners = s.winnerCount || 1;
   let useCustom = false;
 
+  function segOn(sel, btn) {
+    $(sel).querySelectorAll('button').forEach((x) => x.classList.remove('on'));
+    btn.classList.add('on');
+  }
   function update() {
     $('#mTitle').textContent =
-      selCat === 'random' ? 'RANDOM BATTLE' :
+      selCat === 'random' ? (stream ? 'STREAM — RANDOM BATTLE' : 'RANDOM BATTLE') :
       selCat === 'quick' ? 'QUICK BATTLE' :
       CATEGORY_META[selCat]?.banner || 'BATTLE';
     const battleRow = $('#mBattleRow');
@@ -174,35 +229,45 @@ export function showSetup(app, { category, preset, autoLive = false, tournament 
     const pool = selCat === 'random' || selCat === 'quick' ? 'varies per match' : String(content.countEnabled(selCat));
     $('#mPool').textContent = `AVAILABLE: ${pool}`;
     if (Number.isFinite(selCount) && selCount > 250) {
-      $('#mPool').textContent += '  ⚠ over 250 contestants may reduce FPS on low-end devices';
+      $('#mPool').textContent += '  over 250 contestants may reduce FPS on low-end devices';
       $('#mPool').classList.add('warn');
     } else $('#mPool').classList.remove('warn');
   }
 
-  $('#mCat')?.addEventListener('change', (e) => {
-    selCat = e.target.value;
-    update();
-  });
-  $('#mCount').querySelectorAll('button').forEach((b) => {
-    b.addEventListener('click', () => {
-      useCustom = false;
-      $('#mCount').querySelectorAll('button').forEach((x) => x.classList.remove('on'));
-      b.classList.add('on');
-      selCount = Number(b.dataset.n);
-    });
-  });
+  $('#mCat')?.addEventListener('change', (e) => { selCat = e.target.value; update(); });
+  $('#mCount').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    useCustom = false;
+    segOn('#mCount', b);
+    selCount = Number(b.dataset.n);
+  }));
   $('#mCustom').addEventListener('input', (e) => {
     useCustom = true;
     selCount = Number(e.target.value) || 0;
     $('#mCount').querySelectorAll('button').forEach((x) => x.classList.remove('on'));
   });
-  $('#mPreset').querySelectorAll('button').forEach((b) => {
-    b.addEventListener('click', () => {
-      selPreset = b.dataset.p;
-      $('#mPreset').querySelectorAll('button').forEach((x) => x.classList.remove('on'));
-      b.classList.add('on');
-    });
+  $('#mPreset').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    selPreset = b.dataset.p;
+    segOn('#mPreset', b);
+  }));
+  $('#mWinners').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    selWinners = Number(b.dataset.w);
+    segOn('#mWinners', b);
+  }));
+  $('#mSpeed').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    segOn('#mSpeed', b);
+    const pct = Number(b.dataset.pct);
+    $('#mSpeedPct').value = pct;
+    $('#mSpeedPctO').textContent = pct + '%';
+  }));
+  $('#mSpeedPct').addEventListener('input', (e) => {
+    $('#mSpeedPctO').textContent = e.target.value + '%';
+    $('#mSpeed').querySelectorAll('button').forEach((x) => x.classList.toggle('on', Number(x.dataset.pct) === Number(e.target.value)));
   });
+  $('#mColl').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => segOn('#mColl', b)));
+  $('#mGaps').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => segOn('#mGaps', b)));
+  $('#mGapPos').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => segOn('#mGapPos', b)));
+  $('#mCtaCmt')?.addEventListener('click', () => $('#mCtaCmt').classList.toggle('on'));
+  $('#mCtaSub')?.addEventListener('click', () => $('#mCtaSub').classList.toggle('on'));
   update();
 
   $('#mCancel').addEventListener('click', () => modal.remove());
@@ -210,15 +275,36 @@ export function showSetup(app, { category, preset, autoLive = false, tournament 
 
   $('#mStart').addEventListener('click', () => {
     modal.remove();
+    // persist gameplay-affecting choices
+    try {
+      settings.set({
+        winnerCount: selWinners,
+        ballSpeed: Number($('#mSpeedPct').value) / 100,
+        collisionPower: $('#mColl').querySelector('button.on')?.dataset.v || 'NORMAL',
+        gapCount: Number($('#mGaps').querySelector('button.on')?.dataset.n || 1),
+        gapPosition: $('#mGapPos').querySelector('button.on')?.dataset.v || 'RANDOM_MATCH',
+        arenaSize: $('#mArena')?.value || 'M',
+        matchDuration: Number($('#mDur')?.value || 45) * 60,
+        ballCount: selCount,
+        tournamentPreset: selPreset,
+        stream: {
+          ...(s.stream || {}),
+          streamCountdown: Number($('#mCd')?.value || 3),
+          commentCta: !$('#mCtaCmt')?.classList.contains('on') ? false : true,
+          subscribeCta: !$('#mCtaSub')?.classList.contains('on') ? false : true,
+          winnerHistoryCount: Number($('#mWinN')?.value || 5),
+        },
+      });
+    } catch (e) { /* storage full — continue with in-memory values */ }
     const cfg = {
       category: selCat,
       count: selCount,
-      preset: selPreset,
-      autoLive,
+      preset: stream ? 'SINGLE' : selPreset,
+      autoLive: autoLive || stream,
+      streamMode: stream,
+      winnerCount: selWinners,
     };
     if (selCat === 'custom') cfg.battleId = $('#mBattle')?.value || content.listBattles()[0]?.id;
     app.startBattle(cfg);
   });
 }
-
-export { LOGO_ICON_FILE };
