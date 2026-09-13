@@ -1,11 +1,13 @@
 name: Build Android APK
 
-# Manual trigger: GitHub → Actions → "Build Android APK" → Run workflow
-# Auto trigger: any tag push like v1.0.1 → builds APK + creates a release
-# with the APK as a direct-download asset.
+# Manual trigger: GitHub → Actions → "Build Android APK" → Run workflow.
+# Arena working-branch pushes build an artifact for QA/download; version tags also
+# create a release with the APK as a direct-download asset.
 on:
   workflow_dispatch:
   push:
+    branches:
+      - 'arena/**'
     tags:
       - 'v*'
 
