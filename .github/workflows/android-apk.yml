@@ -103,6 +103,27 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
+      # The branch artifact is intentionally published for direct installation:
+      # the requesting user receives a stable raw GitHub download URL instead
+      # of a short-lived Actions artifact URL. [skip ci] prevents a build loop.
+      - name: Publish direct APK download (Arena branches)
+        if: startsWith(github.ref, 'refs/heads/arena/')
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEST="downloads/BattleLoop-Live-v2.0.1-debug.apk"
+          mkdir -p downloads
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$DEST"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f "$DEST"
+          if git diff --cached --quiet; then
+            echo "APK is already current; no publish commit needed."
+          else
+            git commit -m "build: publish BattleLoop Live v2.0.1 APK [skip ci]"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
       - name: Create release with APK (tag builds only)
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
