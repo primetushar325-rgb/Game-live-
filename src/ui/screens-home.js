@@ -29,6 +29,7 @@ const HOME_BTNS = [
   { id: 'tournament', label: 'TOURNAMENT', ic: 'trophy', cat: 'tournament' },
   { id: 'autoLive', label: 'AUTO LIVE', ic: 'zap', cat: 'autoLive', hot: true },
   { id: 'stream', label: 'STREAM MODE', ic: 'live', cat: 'stream', hot: true },
+  { id: 'cutter', label: 'CUTTER ROAD 3D', ic: 'cutter', cat: 'cutter', hot: true },
   { id: 'content', label: 'CONTENT MANAGER', ic: 'folder' },
   { id: 'settings', label: 'SETTINGS', ic: 'gear' },
 ];
@@ -83,6 +84,9 @@ function onHomeBtn(app, id) {
       break;
     case 'stream':
       showSetup(app, { category: 'countries', stream: true, preset: 'SINGLE' });
+      break;
+    case 'cutter':
+      app.navigate('cutter');
       break;
     case 'content':
       app.navigate('content');

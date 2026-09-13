@@ -1,18 +1,25 @@
 # BATTLELOOP LIVE
 
 > **WHO WILL SURVIVE?** — a live elimination battle arena built for YouTube Live streaming.
-> **v2.0.1** — Stream-Mode engine edition with resilient local contestant assets.
+> **v2.1.0** — Stream-Mode engine edition plus CUTTER ROAD 3D.
 
 Circular physics arena with **configurable exit gaps (1–4)**. Balls (flags / logos / custom
 fighters) bounce, collide and spin — the only way to be eliminated is to **completely leave
 through a gap**. Physics decides the winner. No forced outcomes, no scripts, no online services.
 
-![status](https://img.shields.io/badge/QA-79%2F79%20headless%20%2B%20DOM%20smoke-success)
+![status](https://img.shields.io/badge/QA-79%2F79%20BattleLoop%20%2B%2020%2F20%20Cutter-success)
+![status](https://img.shields.io/badge/UI-DOM%20smoke%20pass-success)
 ![status](https://img.shields.io/badge/build-vite%20production-success)
 ![status](https://img.shields.io/badge/offline--first-100%25%20local-informational)
-![badge](https://img.shields.io/badge/v-2.0.1-brightgreen)
+![badge](https://img.shields.io/badge/v-2.1.0-brightgreen)
 
 ---
+
+## Cutter Road 3D (new in 2.1)
+
+A separate, local-first endless cutting mode is available from **Home → CUTTER ROAD 3D**. It uses a mobile-efficient procedural pseudo-3D road with depth perspective, recycled road sections, dynamic side lighting, a rotating upgradeable cutter, touch swipe lanes, choice gates, material-specific effects, score/combo/energy systems, Super Cut, upgrades and local progression.
+
+No external 3D models, textures or audio files are required: all road/object visuals, particles and sound cues are generated procedurally. Cutter Road progress is isolated under `battleloop.cutter-road.v1`; it never overwrites BattleLoop matches, contestants, settings or history.
 
 ## What's new in 2.0
 

@@ -18,6 +18,8 @@ import { renderContent } from './screens-content.js';
 import { renderSettings } from './screens-settings.js';
 import { renderHistory, renderTest } from './screens-misc.js';
 import { createLiveView } from './live.js';
+import { renderCutterMenu, renderCutterUpgrades, createCutterLiveView } from './screens-cutter.js';
+import { createCutterSave } from '../cutter/save.js';
 import { preloadContestantAssets } from '../assets/contestantAssets.js';
 import { CATEGORIES } from '../config/defaults.js';
 
@@ -28,6 +30,7 @@ export function createApp(root) {
   const settings = createSettings(storage);
   const content = createContent(storage);
   const history = createHistory(storage);
+  const cutterSave = createCutterSave(storage);
   const bus = new EventBus();
   const toast = makeToast(root);
 
@@ -61,17 +64,21 @@ export function createApp(root) {
 
   /* ---------- views ---------- */
   let liveView = null;
+  let cutterView = null;
   let launchGeneration = 0;
   function clearRoot() {
     launchGeneration++;
     liveView?.destroy();
     liveView = null;
+    cutterView?.destroy();
+    cutterView = null;
+    if (typeof app !== 'undefined') app.cutterGame = null;
     if (app._testTimer) { clearInterval(app._testTimer); app._testTimer = null; }
     root.innerHTML = '';
   }
 
   const app = {
-    root, settings, content, history, bus, match, toast, sfx, voice, music,
+    root, settings, content, history, cutterSave, bus, match, toast, sfx, voice, music,
     clearRoot,
 
     navigate(name) {
@@ -83,6 +90,8 @@ export function createApp(root) {
       else if (name === 'settings') renderSettings(app);
       else if (name === 'history') renderHistory(app);
       else if (name === 'test') renderTest(app);
+      else if (name === 'cutter') renderCutterMenu(app);
+      else if (name === 'cutter-upgrades') renderCutterUpgrades(app);
       else renderHome(app);
     },
 
@@ -151,6 +160,29 @@ export function createApp(root) {
       renderHome(app);
     },
 
+    /** Launches the isolated Cutter Road renderer/engine without touching Match. */
+    startCutter(mode) {
+      if (!cutterSave.isUnlocked(mode)) {
+        toast('This Cutter Road mode is still locked. Cut more objects first.');
+        return;
+      }
+      match.abandon();
+      clearRoot();
+      try {
+        cutterView = createCutterLiveView(app, mode);
+        app.cutterGame = cutterView.game;
+      } catch (e) {
+        toast('Cutter Road could not start: ' + e.message);
+        renderCutterMenu(app);
+      }
+    },
+
+    exitCutter() {
+      cutterView?.finish?.();
+      clearRoot();
+      renderCutterMenu(app);
+    },
+
     setMuted(b) {
       muteState.on = !!b;
       music.applyVol();
@@ -183,6 +215,18 @@ export function createApp(root) {
     last = ts;
     match.update(dt);
     if (liveView) liveView.frame(dt);
+    if (cutterView) {
+      try { cutterView.frame(dt); }
+      catch (e) {
+        // Cutter Road is optional. A renderer/device failure exits only this
+        // mode and leaves the established BattleLoop application usable.
+        console.error('[cutter-road]', e);
+        cutterView?.finish?.();
+        clearRoot();
+        toast('Cutter Road reset safely after an unexpected error.');
+        renderCutterMenu(app);
+      }
+    }
     // auto quality (FPS protection)
     if (settings.get().autoQuality) {
       ema = ema * 0.95 + (dt * 1000) * 0.05;

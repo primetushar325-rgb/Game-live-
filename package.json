@@ -1,7 +1,7 @@
 {
   "name": "battleloop-live",
   "private": true,
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "BATTLELOOP LIVE — circular elimination battle arena for YouTube Live streaming. Who will survive?",
   "type": "module",
   "scripts": {
@@ -9,7 +9,10 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "icons": "node scripts/make-icons.js",
-    "qa": "node qa/headless.js",
+    "qa": "npm run qa:core && npm run qa:cutter && npm run qa:dom",
+    "qa:core": "node qa/headless.js",
+    "qa:cutter": "node qa/cutter-headless.js",
+    "qa:dom": "node qa/dom-smoke.js",
     "cap:sync": "cap sync android"
   },
   "devDependencies": {

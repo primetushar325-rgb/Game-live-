@@ -97,7 +97,7 @@ console.log('=== DOM SMOKE TEST ===');
 step('splash -> home');
 await sleep(2300);
 check('splash -> home screen', !!$('.home'), `body=${root.innerHTML.slice(0, 60)}`);
-check('home has all 13 mode buttons', $$('.hbtn').length === 13, `got ${$$('.hbtn').length}`);
+check('home has all 14 mode buttons', $$('.hbtn').length === 14, `got ${$$('.hbtn').length}`);
 
 /* --- start a country battle --- */
 step('start country battle');
@@ -227,6 +227,35 @@ check('force elimination reduced left', killed && app.match.left === before - 1,
 app.exitLive();
 await sleep(30);
 check('exit -> home', !!$('.home'));
+
+/* --- CUTTER ROAD 3D: separate menu, run controls, energy and return path --- */
+step('cutter road: menu -> run -> super -> pause -> menu');
+$$('.hbtn').find((b) => b.dataset.id === 'cutter').click();
+await sleep(50);
+check('cutter menu renders all object modes', $$('.cutter-mode').length === 8, `modes=${$$('.cutter-mode').length}`);
+check('cutter upgrade entry renders', !!$('#crUpgrade'));
+$$('.cutter-mode').find((b) => b.dataset.mode === 'food').click();
+await sleep(100);
+check('cutter live canvas and HUD render', !!$('#crCanvas') && !!$('#crScore') && !!app.cutterGame, app.cutterGame?.state);
+await sleep(3400);
+check('cutter run starts after countdown', app.cutterGame?.state === 'running', app.cutterGame?.state);
+app.cutterGame.energy = app.cutterGame.energyCapacity;
+await sleep(30); // allow the real HUD frame to enable the action button
+$('#crSuper').click();
+await sleep(30);
+check('cutter Super Cut activates from full energy', app.cutterGame.superT > 0, `super=${app.cutterGame.superT}`);
+$('#crPause').click();
+await sleep(30);
+check('cutter pause panel works', app.cutterGame?.state === 'paused' && !!$('#crResume'));
+$('#crResume').click();
+await sleep(30);
+check('cutter resume works', app.cutterGame?.state === 'running');
+app.exitCutter();
+await sleep(30);
+check('cutter exit returns to its own menu', !!$('.cutter-menu'));
+app.navigate('home');
+await sleep(30);
+check('cutter menu returns safely to original home', !!$('.home'));
 
 /* --- STREAM MODE end-to-end (auto forever loop, same category) --- */
 step('stream mode: start -> auto matches -> stop');
